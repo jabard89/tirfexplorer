@@ -22,7 +22,7 @@ function varargout = tirfexplorer(varargin)
 
 % Edit the above text to modify the response to help tirfexplorer
 
-% Last Modified by GUIDE v2.5 07-Mar-2017 11:04:48
+% Last Modified by GUIDE v2.5 17-Mar-2017 14:21:53
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -293,6 +293,7 @@ elseif x_p > win_dim(1) || y_p > win_dim(2)
     msgbox('Pick a Point in the Correct Channel')
     return
 end
+end
 
 p_box=[x_p-3 y_p-3;x_p+3 y_p+3];
 %load peak list
@@ -312,9 +313,8 @@ end
 %Export peak name to handles
 [found peakl_i]=ismember(near,list,'rows');
 handles.peakl_i=peakl_i;
-handles=plotpoint(handles,'left',near);
+handles=plotPoint2(handles,'left',near);
 guidata(hObject,handles)
-end
 
 % --- Executes on button press in pushbutton5.
 function pushbutton5_Callback(hObject, eventdata, handles)
@@ -333,6 +333,7 @@ elseif x_p > win_dim(1) || y_p > win_dim(2)
     msgbox('Pick a Point in the Correct Channel')
     return
 end
+end
 
 p_box=[x_p-3 y_p-3;x_p+3 y_p+3];
 %load peak list
@@ -349,10 +350,8 @@ elseif size(near,1) < 1
 end
 [found peakr_i]=ismember(near,list,'rows');
 handles.peakr_i=peakr_i;
-handles=plotpoint(handles,'right',near);
+handles=plotPoint2(handles,'right',near);
 guidata(hObject,handles)
-end
-
 
 % --- Executes on button press in pushbutton6.
 function pushbutton6_Callback(hObject, eventdata, handles)
@@ -360,8 +359,8 @@ function pushbutton6_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 %Calculate Relative traces
-ltrace=handles.ltrace;
-rtrace=handles.rtrace;
+ltrace=squeeze(handles.ltrace{1});
+rtrace=squeeze(handles.rtrace{1});
 lt=smooth(ltrace(2,:)-ltrace(3,:));
 rt=smooth(rtrace(2,:)-rtrace(3,:));
 %scale lt and rt to min and max
@@ -441,7 +440,7 @@ peak1=handles.exp.linked_lpeaks(peak_i,1:2);
 peak2=handles.exp.linked_rpeaks(peak_i,1:2);
 handles.peak1=peak1;
 handles.peak2=peak2;
-handles=plotpoint(handles,'both',peak1,peak2);
+handles=plotPoint2(handles,'both',peak1,peak2);
 guidata(hObject,handles)
 
 % --- Executes during object creation, after setting all properties.
@@ -526,12 +525,12 @@ function export_t_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 %Exports the current left and right traces as objects to the workspace
 if isfield(handles,'ltrace')
-    ltrace=handles.ltrace;
+    ltrace=squeeze(handles.ltrace{1});
     peak_lname=inputdlg('Name the Left Peak');
     assignin('base',peak_lname{1},ltrace);
 end
 if isfield(handles,'rtrace')
-    rtrace=handles.rtrace;
+    rtrace=squeeze(handles.rtrace{1});
     peak_rname=inputdlg('Name the Right Peak');
     assignin('base',peak_rname{1},rtrace);
 end
@@ -643,7 +642,6 @@ function show_properties_Callback(hObject, eventdata, handles)
 % hObject    handle to show_properties (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-a='apple';
 left_dim_msg=sprintf('%s%s%s','Current Left Dimensions (X_min X_max Y_min Y_max): ['...
     ,num2str(handles.left_dim),']');
 right_dim_msg=sprintf('%s%s%s','Current Right Dimensions (X_min X_max Y_min Y_max): ['...

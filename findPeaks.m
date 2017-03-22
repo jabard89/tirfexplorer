@@ -1,4 +1,4 @@
-function particles = findPeaks(im,thresh)
+function [particles thresh] = findPeaks(im,thresh)
 %%Peak Finding Algorithm
 %Finds peaks in TIRF images, using functions from twoTones
     % Twotone TIRF-FRET image analysis software.
