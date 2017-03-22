@@ -36,4 +36,3 @@ bpdiameter=lp;
 windowsize=lp; %how far to let the gaussain fit algorithm search
 out = findpeaks3(im_filt,im,thresh,bpdiameter,windowsize);
 particles=out(:,1:4);
-end
