@@ -22,7 +22,7 @@ function varargout = tirfexplorer(varargin)
 
 % Edit the above text to modify the response to help tirfexplorer
 
-% Last Modified by GUIDE v2.5 03-Mar-2017 14:59:35
+% Last Modified by GUIDE v2.5 07-Mar-2017 11:04:48
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -54,6 +54,12 @@ function tirfexplorer_OpeningFcn(hObject, eventdata, handles, varargin)
 % Choose default command line output for tirfexplorer
 handles.output = hObject;
 
+%Set initial parameters
+handles.rinnercircle=3;
+handles.routercircle=6;
+handles.left_dim=[25 235 10 500];
+handles.right_dim=[269 479 9 499];
+handles.n_images=5;
 % Update handles structure
 guidata(hObject, handles);
 
@@ -83,12 +89,18 @@ function pushbutton1_Callback(hObject, eventdata, handles)
 axes(handles.axes1);
 cla;
 guidata(hObject,handles)
+if ~isfield(handles,'file')
+    errordlg('Please select a tif movie file')
+    return
+end
+
+if ~isfield(handles,'tform')
+    errordlg('Please load a map (use menu)')
+    return
+end
+
 file=handles.file;
 n_images=handles.n_images;
-% left_dim=[25 235 10 500];
-% right_dim=[269 479 9 499];
-% handles.left_dim=left_dim;
-% handles.right_dim=right_dim;
 left_dim=handles.left_dim;
 right_dim=handles.right_dim;
 exp=loadAverage(file,1,n_images);
@@ -146,7 +158,8 @@ for i=1:floor(n_images/5)
     size(exp.rfilt)
 end
 %find matching pairs between the two channels
-[exp.linknames exp.linki exp.lpeaksl exp.lpeaksr]=linkPeaks(handles.tform,exp.lfilt,exp.rfilt,4);
+[exp.linknames exp.linki exp.linked_lpeaks exp.linked_rpeaks]=...
+    linkPeaks(handles.tform,exp.lfilt,exp.rfilt,4);
 handles.exp=exp;
 %Update the list of peaks
 set(handles.listbox2,'String',handles.exp.linknames)
@@ -157,13 +170,13 @@ axes(handles.axes2);
 imshow(exp.avgl,[])
 hold on
 plot(exp.lfilt(:,1),exp.lfilt(:,2),'yo')
-plot(exp.lpeaksl(:,1),exp.lpeaksl(:,2),'ro')
+plot(exp.linked_lpeaks(:,1),exp.linked_lpeaks(:,2),'ro')
 hold off
 axes(handles.axes3);
 imshow(exp.avgr,[])
 hold on
 plot(exp.rfilt(:,1),exp.rfilt(:,2),'yo')
-plot(exp.lpeaksr(:,1),exp.lpeaksr(:,2),'ro')
+plot(exp.linked_rpeaks(:,1),exp.linked_rpeaks(:,2),'ro')
 hold off
 finished='yes'
 
@@ -388,9 +401,6 @@ function edit1_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
-n_images=10;
-handles.n_images=n_images;
-guidata(hObject,handles);
 
 % --- Executes on selection change in popupmenu3.
 function popupmenu3_Callback(hObject, eventdata, handles)
@@ -427,8 +437,8 @@ a='apple';
 peak_i=get(hObject,'Value');
 handles.peakl_i=peak_i;
 handles.peakr_i=peak_i;
-peak1=handles.exp.lpeaksl(peak_i,1:2);
-peak2=handles.exp.lpeaksr(peak_i,1:2);
+peak1=handles.exp.linked_lpeaks(peak_i,1:2);
+peak2=handles.exp.linked_rpeaks(peak_i,1:2);
 handles.peak1=peak1;
 handles.peak2=peak2;
 handles=plotpoint(handles,'both',peak1,peak2);
@@ -474,10 +484,6 @@ function edit4_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
-left_dim=[25 235 10 500];
-handles.left_dim=left_dim;
-guidata(hObject,handles);
-
 % --------------------------------------------------------------------
 function Untitled_1_Callback(hObject, eventdata, handles)
 % hObject    handle to Untitled_1 (see GCBO)
@@ -512,10 +518,6 @@ function edit6_CreateFcn(hObject, eventdata, handles)
 if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
     set(hObject,'BackgroundColor','white');
 end
-right_dim=[269 479 9 499];
-handles.right_dim=right_dim;
-guidata(hObject,handles);
-
 
 % --------------------------------------------------------------------
 function export_t_Callback(hObject, eventdata, handles)
@@ -533,3 +535,125 @@ if isfield(handles,'rtrace')
     peak_rname=inputdlg('Name the Right Peak');
     assignin('base',peak_rname{1},rtrace);
 end
+
+
+% --------------------------------------------------------------------
+function export_all_Callback(hObject, eventdata, handles)
+% hObject    handle to export_all (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+%Export all traces listed as linked peaks
+%Output trace is a cell where each cell contains traces for one channel
+%traces are stored as an array [each_peak pScore_output frame]
+%pScore_output follows this format:
+%[Total_Peak_intensity (signal minus noise), avg_peak_intensity (average
+%signal), avg_bkgd_intensity, peak_size, background_size]
+linked_traces=tracemovie_tif_dim(handles.file,handles.rinnercircle,...
+    handles.routercircle,2,handles.exp.linked_lpeaks,handles.left_dim,...
+    handles.exp.linked_rpeaks,handles.right_dim);
+exp=handles.exp;
+exp.linked_ltraces=linked_traces{1};
+exp.linked_rtraces=linked_traces{2};
+exp_name=inputdlg('Name the Exp File');
+assignin('base',exp_name{1},exp);
+
+
+% --------------------------------------------------------------------
+function Untitled_2_Callback(hObject, eventdata, handles)
+% hObject    handle to Untitled_2 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --------------------------------------------------------------------
+function change_radii_Callback(hObject, eventdata, handles)
+% hObject    handle to change_radii (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+rinnercircle_msg=sprintf('%s%d%s\n%s','Current rinnercircle (peak size) is '...
+    ,handles.rinnercircle,'.','Change to:');
+rinnercircle=inputdlg(rinnercircle_msg);
+routercircle_msg=sprintf('%s%d%s\n%s',...
+    'Current routercircle (bkgd doughnut size) is '...
+    ,handles.routercircle,'.','Change to:');
+routercircle=inputdlg(routercircle_msg);
+handles.rinnercircle=str2num(rinnercircle{1});
+handles.routercircle=str2num(routercircle{1});
+guidata(hObject,handles);
+
+
+% --------------------------------------------------------------------
+function Untitled_3_Callback(hObject, eventdata, handles)
+% hObject    handle to Untitled_3 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --------------------------------------------------------------------
+function load_map_Callback(hObject, eventdata, handles)
+% hObject    handle to load_map (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+map_name='';
+map_path='';
+[map_name, map_path]=uigetfile('*','Open Map','E:\Martin\Data\TIRF!');
+handles.map_file=[map_path map_name];
+map=load(handles.map_file);
+map_var=fieldnames(map);
+map=map.(map_var{1});
+tform=cp2tform(map(:,1:2),map(:,3:4),'projective');
+handles.tform=tform;
+guidata(hObject,handles)
+
+
+% --------------------------------------------------------------------
+function change_left_dim_Callback(hObject, eventdata, handles)
+% hObject    handle to change_left_dim (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+left_dim_msg=sprintf('%s%s%s\n%s','Current Left Dimensions (X_min X_max Y_min Y_max): ['...
+    ,num2str(handles.left_dim),']','Change to:');
+left_string=inputdlg(left_dim_msg);
+handles.left_dim=str2num(left_string{1});
+guidata(hObject,handles);
+% --------------------------------------------------------------------
+function change_right_dim_Callback(hObject, eventdata, handles)
+% hObject    handle to change_right_dim (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+right_dim_msg=sprintf('%s%s%s\n%s','Current Right Dimensions (X_min X_max Y_min Y_max): ['...
+    ,num2str(handles.right_dim),']','Change to:');
+right_string=inputdlg(right_dim_msg);
+handles.left_dim=str2num(right_string{1});
+guidata(hObject,handles);
+% --------------------------------------------------------------------
+function change_nimages_Callback(hObject, eventdata, handles)
+% hObject    handle to change_nimages (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+n_images_msg=sprintf('%s%s%s\n%s','Current # of images to average is: '...
+    ,num2str(handles.n_images),'.','Change to:');
+n_images_string=inputdlg(n_images_msg);
+handles.n_images=str2num(n_images_string{1});
+guidata(hObject,handles);
+
+
+% --------------------------------------------------------------------
+function show_properties_Callback(hObject, eventdata, handles)
+% hObject    handle to show_properties (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+a='apple';
+left_dim_msg=sprintf('%s%s%s','Current Left Dimensions (X_min X_max Y_min Y_max): ['...
+    ,num2str(handles.left_dim),']');
+right_dim_msg=sprintf('%s%s%s','Current Right Dimensions (X_min X_max Y_min Y_max): ['...
+    ,num2str(handles.right_dim),']');
+n_images_msg=sprintf('%s%s%s','Current # of images to average is: '...
+    ,num2str(handles.n_images),'.');
+rinnercircle_msg=sprintf('%s%d%s','Current rinnercircle (peak size) is: '...
+    ,handles.rinnercircle,'.');
+routercircle_msg=sprintf('%s%d%s',...
+    'Current routercircle (bkgd doughnut size) is: '...
+    ,handles.routercircle,'.');
+msgbox({left_dim_msg,right_dim_msg,n_images_msg,rinnercircle_msg,...
+    routercircle_msg});
