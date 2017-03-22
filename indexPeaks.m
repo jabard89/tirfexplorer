@@ -1,4 +1,4 @@
-function [pindex]=indexPeaks(image_size,peaks,rinnerCircle,routerCircle)
+function [pindex]=indexPeaks(image_size,peaks,rinnercircle,routercircle)
 %%Creates index of pixels to score
 %Jared Bard August 19, 2014
 %MakeCircle is based on the twoTone image suite
@@ -15,6 +15,6 @@ npeaks=size(peaks,1);
 pindex=cell(npeaks,2);
 for i =1:npeaks
     [pindex{i,1} pindex{i,2}]=MakeCircle(image_size,peaks(i,1:2),...
-        rinnerCircle,routerCircle);
+        rinnercircle,routercircle);
 end
 end

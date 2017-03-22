@@ -8,7 +8,8 @@ function [intensities]=pScore(image,pindex)%%Intensity Finder
     % Copyright (C) 2010, Isis Innovation Limited.
     % All rights reserved.
 %Given an image with an index of pixels to evaluate (from indexPeaks),
-%calculates the intensity of each peak
+%calculates the intensity of each peak (total signal minus background
+%signal)
 %also calculates the background level by calculating the intensity of a
 %ring around the inner circle, with a total radius of routerCircle. the
 %mean intensity of that ring is then used to calculate the total background
@@ -38,7 +39,8 @@ for i = 1:npeaks
     ringTotal=sum(image(pindex{i,1}));
     ringAvg=ringTotal/ringSize;
     circleAvg=circleTotal/circleSize;
-    intensities(i,1)=circleTotal;
+    peakIntensity=circleTotal-ringAvg.*circleSize;
+    intensities(i,1)=peakIntensity;
     intensities(i,2:5)=[circleAvg ringAvg circleSize ringSize];
 end
 end

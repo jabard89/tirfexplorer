@@ -5,6 +5,11 @@ function [trace]=tracemovie_dim(file,rinnercircle,...
 %Each channel will have a column in the peak_cell: 1=# of peaks,
 %2=dimensions of channel, 3=list of peaks in that channel 4=indexes for
 %each peak
+%Output trace is a cell where each cell contains traces for one channel
+%traces are stored as an array [each_peak pScore_output frame]
+%pScore_output follows this format:
+%[Total_Peak_intensity (signal minus noise), avg_peak_intensity (average
+%signal), avg_bkgd_intensity, peak_size, background_size]
 %%First extract file information from the tif file
 file_info=imfinfo(file);
 file_x=file_info(1).Width;
@@ -13,13 +18,13 @@ file_length=length(file_info);
 peak_cell=cell(nch,4);
 if nch>=1
     peak_cell{1,1}=size(peaks1,1);
+    peak_cell{1,2}=dim1;
     peak_cell{1,3}=peaks1;
 end
 if nch>=2
     peak_cell{2,1}=size(peaks2,1);
     peak_cell{2,2}=dim2;
     peak_cell{2,3}=peaks2;
-    
 end
 if nch==3
     peak_cell{3,1}=size(peaks3,1);
@@ -28,32 +33,18 @@ if nch==3
 end
 %get dimensions of each channel;
 trace=cell(nch,1);
-if nch == 1
-    x_start=dim1(1);
-    x_end=dim1(2);
-    y_start=dim1(3);
-    y_end=dim1(4);
-    peak_cell{1,2}=[x_start x_end y_start y_end];
+for i =1:nch
+    x_start=peak_cell{i,2}(1);
+    x_end=peak_cell{i,2}(2);
+    y_start=peak_cell{i,2}(3);
+    y_end=peak_cell{i,2}(4);
+    %Generate peakIndex for each channel
     %calculate indexes of peaks based on size of peak (innercircle) and
-    %size of background (routercircle)
-    peak_cell{1,4}=indexPeaks([(y_end-y_start+1) (x_end-x_start+1)],...
-            peak_cell{1,3},rinnercircle,routercircle);
-else
-%     x_start=0;
-%     x_end=0;
-%     y_start=0;
-%     y_start=0;
-    for i =1:nch
-        x_start=peak_cell{i,2}(1);
-        x_end=peak_cell{i,2}(2);
-        y_start=peak_cell{i,2}(3);
-        y_end=peak_cell{i,2}(4);
-        %Generate peakIndex for each channel
-        peak_cell{i,4}=indexPeaks([(y_end-y_start+1) (x_end-x_start+1)],...
-            peak_cell{i,3},rinnercircle,routercircle);
-        %initialize array to store traces
-        trace{i,1}=zeros(peak_cell{i,1},5,file_length,'int16');
-    end
+%size of background (routercircle) ([indexOutercircle indexInnercircle])
+    peak_cell{i,4}=indexPeaks([(y_end-y_start+1) (x_end-x_start+1)],...
+        peak_cell{i,3},rinnercircle,routercircle);
+    %initialize array to store traces
+    trace{i,1}=zeros(peak_cell{i,1},5,file_length,'double');
 end
 
 %%Extract intensities

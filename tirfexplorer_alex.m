@@ -1,35 +1,35 @@
-function varargout = tirfexplorer(varargin)
-% TIRFEXPLORER MATLAB code for tirfexplorer.fig
-%      TIRFEXPLORER, by itself, creates a new TIRFEXPLORER or raises the existing
+function varargout = tirfexplorer_alex(varargin)
+% TIRFEXPLORER_ALEX MATLAB code for tirfexplorer_alex.fig
+%      TIRFEXPLORER_ALEX, by itself, creates a new TIRFEXPLORER_ALEX or raises the existing
 %      singleton*.
 %
-%      H = TIRFEXPLORER returns the handle to a new TIRFEXPLORER or the handle to
+%      H = TIRFEXPLORER_ALEX returns the handle to a new TIRFEXPLORER_ALEX or the handle to
 %      the existing singleton*.
 %
-%      TIRFEXPLORER('CALLBACK',hObject,eventData,handles,...) calls the local
-%      function named CALLBACK in TIRFEXPLORER.M with the given input arguments.
+%      TIRFEXPLORER_ALEX('CALLBACK',hObject,eventData,handles,...) calls the local
+%      function named CALLBACK in TIRFEXPLORER_ALEX.M with the given input arguments.
 %
-%      TIRFEXPLORER('Property','Value',...) creates a new TIRFEXPLORER or raises the
+%      TIRFEXPLORER_ALEX('Property','Value',...) creates a new TIRFEXPLORER_ALEX or raises the
 %      existing singleton*.  Starting from the left, property value pairs are
-%      applied to the GUI before tirfexplorer_OpeningFcn gets called.  An
+%      applied to the GUI before tirfexplorer_alex_OpeningFcn gets called.  An
 %      unrecognized property name or invalid value makes property application
-%      stop.  All inputs are passed to tirfexplorer_OpeningFcn via varargin.
+%      stop.  All inputs are passed to tirfexplorer_alex_OpeningFcn via varargin.
 %
 %      *See GUI Options on GUIDE's Tools menu.  Choose "GUI allows only one
 %      instance to run (singleton)".
 %
 % See also: GUIDE, GUIDATA, GUIHANDLES
 
-% Edit the above text to modify the response to help tirfexplorer
+% Edit the above text to modify the response to help tirfexplorer_alex
 
-% Last Modified by GUIDE v2.5 17-Mar-2017 14:21:53
+% Last Modified by GUIDE v2.5 19-Mar-2017 22:25:53
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
 gui_State = struct('gui_Name',       mfilename, ...
                    'gui_Singleton',  gui_Singleton, ...
-                   'gui_OpeningFcn', @tirfexplorer_OpeningFcn, ...
-                   'gui_OutputFcn',  @tirfexplorer_OutputFcn, ...
+                   'gui_OpeningFcn', @tirfexplorer_alex_OpeningFcn, ...
+                   'gui_OutputFcn',  @tirfexplorer_alex_OutputFcn, ...
                    'gui_LayoutFcn',  [] , ...
                    'gui_Callback',   []);
 if nargin && ischar(varargin{1})
@@ -43,15 +43,15 @@ else
 end
 % End initialization code - DO NOT EDIT
 
-% --- Executes just before tirfexplorer is made visible.
-function tirfexplorer_OpeningFcn(hObject, eventdata, handles, varargin)
+% --- Executes just before tirfexplorer_alex is made visible.
+function tirfexplorer_alex_OpeningFcn(hObject, eventdata, handles, varargin)
 % This function has no output args, see OutputFcn.
 % hObject    handle to figure
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-% varargin   command line arguments to tirfexplorer (see VARARGIN)
+% varargin   command line arguments to tirfexplorer_alex (see VARARGIN)
 
-% Choose default command line output for tirfexplorer
+% Choose default command line output for tirfexplorer_alex
 handles.output = hObject;
 
 %Set initial parameters
@@ -60,19 +60,21 @@ handles.routercircle=6;
 handles.left_dim=[25 235 10 500];
 handles.right_dim=[269 479 9 499];
 handles.n_images=5;
+handles.alexToggle=0;
+
 % Update handles structure
 guidata(hObject, handles);
 
 % This sets up the initial plot - only do when we are invisible
-% so window can get raised using tirfexplorer.
+% so window can get raised using tirfexplorer_alex.
 
 
-% UIWAIT makes tirfexplorer wait for user response (see UIRESUME)
+% UIWAIT makes tirfexplorer_alex wait for user response (see UIRESUME)
 % uiwait(handles.figure1);
 
 
 % --- Outputs from this function are returned to the command line.
-function varargout = tirfexplorer_OutputFcn(hObject, eventdata, handles)
+function varargout = tirfexplorer_alex_OutputFcn(hObject, eventdata, handles)
 % varargout  cell array for returning output args (see VARARGOUT);
 % hObject    handle to figure
 % eventdata  reserved - to be defined in a future version of MATLAB
@@ -89,7 +91,7 @@ function pushbutton1_Callback(hObject, eventdata, handles)
 axes(handles.axes1);
 cla;
 guidata(hObject,handles)
-if ~isfield(handles,'file')
+if ~isfield(handles,'donorFile')
     errordlg('Please select a tif movie file')
     return
 end
@@ -99,28 +101,53 @@ if ~isfield(handles,'tform')
     return
 end
 
-file=handles.file;
+donorFile=handles.donorFile;
+if handles.alexToggle
+    acceptorFile=handles.acceptorFile;
+end
 n_images=handles.n_images;
 left_dim=handles.left_dim;
 right_dim=handles.right_dim;
-exp=loadAverage(file,1,n_images);
+exp=loadAverage(donorFile,1,n_images);
 exp.avgl=exp.avg(left_dim(3):left_dim(4),left_dim(1):left_dim(2));
+%If alex is turned on, also load an additional average for the other
+%channel
 exp.avgr=exp.avg(right_dim(3):right_dim(4),right_dim(1):right_dim(2));
+if handles.alexToggle
+    expAcceptor=loadAverage(acceptorFile,1,n_images);
+    expAcceptor.avgl=expAcceptor.avg(left_dim(3):left_dim(4),...
+        left_dim(1):left_dim(2));
+    expAcceptor.avgr=expAcceptor.avg(right_dim(3):right_dim(4),...
+        right_dim(1):right_dim(2));
+end
 counter=-4;
 exp.lfilt=[];
 exp.rfilt=[];
 %dimensions=[x_start x_end y_start y_end]
 
+%First loop ask for threshhold, but use the same threshold for the
+%remaining loops
+threshFlag=0;
 for i=1:floor(n_images/5)
     counter=counter+5
     %first load a moving average of the image
-    temp=loadAverage(file,i,5);
+    temp=loadAverage(donorFile,counter,counter+5);
     temp.l=temp.avg(left_dim(3):left_dim(4),left_dim(1):left_dim(2));
     temp.r=temp.avg(right_dim(3):right_dim(4),right_dim(1):right_dim(2));
+    if handles.alexToggle
+        tempAcceptor=loadAverage(acceptorFile,counter,counter+5);
+        temp.r=tempAcceptor.avg(right_dim(3):right_dim(4),...
+            right_dim(1):right_dim(2));
+    end
     %then find all the peaks in the image and filter them for crowding and
     %shape of the peak
-    temp.lp=findPeaks(temp.l);
-    temp.rp=findPeaks(temp.r);
+    if threshFlag
+        [temp.lp]=findPeaks(temp.l,lThresh);
+        [temp.rp]=findPeaks(temp.r,rThresh);
+    else
+        [temp.lp lThresh]=findPeaks(temp.l);
+        [temp.rp rThresh]=findPeaks(temp.r);
+    end
     temp.lfilt=filterPeaks(temp.l,temp.lp,10,2);
     temp.rfilt=filterPeaks(temp.r,temp.rp,10,2);
     n_lfilt=size(exp.lfilt,1);
@@ -156,11 +183,15 @@ for i=1:floor(n_images/5)
     temp
     size(exp.lfilt)
     size(exp.rfilt)
+    threshFlag=1;
 end
 %find matching pairs between the two channels
 [exp.linknames exp.linki exp.linked_lpeaks exp.linked_rpeaks]=...
     linkPeaks(handles.tform,exp.lfilt,exp.rfilt,4);
 handles.exp=exp;
+if handles.alexToggle
+    handles.expAcceptor=expAcceptor;
+end
 %Update the list of peaks
 set(handles.listbox2,'String',handles.exp.linknames)
 guidata(hObject,handles);
@@ -178,6 +209,14 @@ hold on
 plot(exp.rfilt(:,1),exp.rfilt(:,2),'yo')
 plot(exp.linked_rpeaks(:,1),exp.linked_rpeaks(:,2),'ro')
 hold off
+if handles.alexToggle
+    axes(handles.axes6);
+    imshow(expAcceptor.avgr,[])
+    hold on
+    plot(exp.rfilt(:,1),exp.rfilt(:,2),'yo')
+    plot(exp.linked_rpeaks(:,1),exp.linked_rpeaks(:,2),'ro')
+    hold off
+end
 finished='yes'
 
 % --------------------------------------------------------------------
@@ -252,7 +291,7 @@ function pushbutton2_Callback(hObject, eventdata, handles)
 filename='';
 pathname='';
 [filename, pathname]=uigetfile('*.tif','Open Tirf','E:\Martin\Data\TIRF!');
-handles.file=[pathname filename];
+handles.donorFile=[pathname filename];
 set(handles.text1,'String',filename);
 guidata(hObject,handles);
 
@@ -280,7 +319,6 @@ function pushbutton4_Callback(hObject, eventdata, handles)
 % hObject    handle to pushbutton4 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-try
 %[point(1) point(2)]=ginputc(1,'Color','r');
 [x_p y_p]=getpts(handles.axes2);
 channel_dim=handles.left_dim;
@@ -292,7 +330,6 @@ if size(x_p,1) > 1
 elseif x_p > win_dim(1) || y_p > win_dim(2)
     msgbox('Pick a Point in the Correct Channel')
     return
-end
 end
 
 p_box=[x_p-3 y_p-3;x_p+3 y_p+3];
@@ -321,8 +358,11 @@ function pushbutton5_Callback(hObject, eventdata, handles)
 % hObject    handle to pushbutton5 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-try
-[x_p y_p]=getpts(handles.axes3);
+if handles.alexToggle
+    [x_p y_p]=getpts(handles.axes6);
+else
+    [x_p y_p]=getpts(handles.axes3);
+end
 channel_dim=handles.right_dim;
 win_dim=[channel_dim(2)-channel_dim(1) channel_dim(4)-channel_dim(3)];
 %make sure correct point is selected
@@ -332,7 +372,6 @@ if size(x_p,1) > 1
 elseif x_p > win_dim(1) || y_p > win_dim(2)
     msgbox('Pick a Point in the Correct Channel')
     return
-end
 end
 
 p_box=[x_p-3 y_p-3;x_p+3 y_p+3];
@@ -360,9 +399,9 @@ function pushbutton6_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 %Calculate Relative traces
 ltrace=squeeze(handles.ltrace{1});
-rtrace=squeeze(handles.rtrace{1});
-lt=smooth(ltrace(2,:)-ltrace(3,:));
-rt=smooth(rtrace(2,:)-rtrace(3,:));
+rtrace=squeeze(handles.rAcceptortraces{1});
+lt=ltrace(2,:)-ltrace(3,:);
+rt=rtrace(2,:)-rtrace(3,:);
 %scale lt and rt to min and max
 lt_s=lt./max(lt);
 rt_s=rt./max(rt);
@@ -655,3 +694,27 @@ routercircle_msg=sprintf('%s%d%s',...
     ,handles.routercircle,'.');
 msgbox({left_dim_msg,right_dim_msg,n_images_msg,rinnercircle_msg,...
     routercircle_msg});
+
+
+% --- Executes on button press in pushbutton7.
+function pushbutton7_Callback(hObject, eventdata, handles)
+% hObject    handle to pushbutton7 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+filename='';
+pathname='';
+[filename, pathname]=uigetfile('*.tif','Open Tirf','E:\Martin\Data\TIRF!');
+handles.acceptorFile=[pathname filename];
+set(handles.text8,'String',filename);
+guidata(hObject,handles);
+
+% --------------------------------------------------------------------
+function alex_toggle_Callback(hObject, eventdata, handles)
+% hObject    handle to alex_toggle (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+alexToggleMsg=sprintf('%s%s%s\n%s',['Toggle ALEX On (1) or Off (0).'...
+    'Current state is: '],num2str(handles.alexToggle),'.','Change to:');
+alexToggleString=inputdlg(alexToggleMsg);
+handles.alexToggle=str2num(alexToggleString{1});
+guidata(hObject,handles);
