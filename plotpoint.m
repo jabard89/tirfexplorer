@@ -1,7 +1,7 @@
 %Given a peak index highlight the proper peaks
 %Jared Bard
 %March 2, 2017
-function [handles] = plotpoint(handles,which_peak,peak1,peak2)
+function [handles] = plotpoint(handles,which_channel,peak1,peak2)
 exp=handles.exp;
 %start by redrawing both channels
 axes(handles.axes2);
@@ -9,17 +9,19 @@ hold off
 imshow(exp.avgl,[])
 hold on
 plot(exp.lfilt(:,1),exp.lfilt(:,2),'yo')
-plot(exp.lpeaksl(:,1),exp.lpeaksl(:,2),'ro')
+plot(exp.linked_lpeaks(:,1),exp.linked_lpeaks(:,2),'ro')
 hold off
 axes(handles.axes3);
 hold off
 imshow(exp.avgr,[])
 hold on
 plot(exp.rfilt(:,1),exp.rfilt(:,2),'yo')
-plot(exp.lpeaksr(:,1),exp.lpeaksr(:,2),'ro')
+plot(exp.linked_rpeaks(:,1),exp.linked_rpeaks(:,2),'ro')
 hold off
-%highlight point and related point
-if strcmp(which_peak,'left')
+%highlight peak and related peak
+    function f1=highlight_peaks(left_peaks,right_peaks)
+    end
+if strcmp(which_channel,'left')
     axes(handles.axes2)
     hold on
     plot(peak1(1),peak1(2),'go');
@@ -30,7 +32,8 @@ if strcmp(which_peak,'left')
     plot(p_tform(1),p_tform(2),'bo');
     hold off
     %run trace
-    trace1=tracemovie_tif_dim(handles.file,3,6,1,peak1,handles.left_dim);
+    trace1=tracemovie_tif_dim(handles.file,handles.rinnercircle,...
+        handles.routercircle,1,peak1,handles.left_dim);
     trace1=squeeze(trace1{1});
     len=length(trace1);
     handles.ltrace=trace1;
@@ -43,7 +46,7 @@ if strcmp(which_peak,'left')
     % hold off
     peak_int=trace1(2,:)-trace1(3,:);
     plot(1:len,peak_int)
-elseif strcmp(which_peak,'right')
+elseif strcmp(which_channel,'right')
     %highlight point and related point
     axes(handles.axes3)
     hold on
@@ -55,7 +58,8 @@ elseif strcmp(which_peak,'right')
     plot(p_tform(1),p_tform(2),'bo')
     hold off
     %run trace
-    trace1=tracemovie_tif_dim(handles.file,3,6,1,peak1,handles.right_dim);
+    trace1=tracemovie_tif_dim(handles.file,handles.rinnercircle,...
+        handles.routercircle,1,peak1,handles.right_dim);
     trace1=squeeze(trace1{1});
     len=length(trace1);
     handles.rtrace=trace1;
@@ -68,7 +72,7 @@ elseif strcmp(which_peak,'right')
     % hold off
     peak_int=trace1(2,:)-trace1(3,:);
     plot(1:len,peak_int)
-elseif strcmp(which_peak,'both')
+elseif strcmp(which_channel,'both')
     axes(handles.axes2)
     hold on
     plot(peak1(1),peak1(2),'go');
@@ -78,7 +82,8 @@ elseif strcmp(which_peak,'both')
     plot(peak2(1),peak2(2),'go');
     hold off
     %run left trace
-    ltrace=tracemovie_tif_dim(handles.file,3,6,1,peak1,handles.left_dim);
+    ltrace=tracemovie_tif_dim(handles.file,handles.rinnercircle,...
+        handles.routercircle,1,peak1,handles.left_dim);
     ltrace=squeeze(ltrace{1});
     len=length(ltrace);
     handles.ltrace=ltrace;
@@ -92,7 +97,8 @@ elseif strcmp(which_peak,'both')
     peak_int=ltrace(2,:)-ltrace(3,:);
     plot(1:len,peak_int)
      %run right trace
-    rtrace=tracemovie_tif_dim(handles.file,3,6,1,peak1,handles.right_dim);
+    rtrace=tracemovie_tif_dim(handles.file,handles.rinnercircle,...
+        handles.routercircle,1,peak1,handles.right_dim);
     rtrace=squeeze(rtrace{1});
     len=length(rtrace);
     handles.rtrace=rtrace;
