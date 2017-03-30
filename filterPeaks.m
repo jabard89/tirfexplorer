@@ -35,25 +35,20 @@ if nargin<4
 end
 
 peaksout(peaks(:,4)>e_thresh,:)=0;
-%%cycle through peaks
+%Now remove peaks too close to the edge
+peaksout(peaks(:,1)<=distance,:)=0;
+peaksout((x_lim-peaks(:,1))<=distance,:)=0;
+peaksout(peaks(:,2)<=distance,:)=0;
+peaksout((y_lim-peaks(:,2))<=distance,:)=0;
+
+%Finally remove peaks that are too close to each other
 %use pdist to create a list of distances
 %distances for two points are at i,j in the matrix
 dist_m=squareform(pdist(peaks(:,1:2)));
 %set the i,i peaks to a large value
 dist_m(dist_m==0)=1e4; %only the i,i peaks should have a distance exactly 0
-for i=1:npeaks
-     p=peaks(i,1:2); %load point    
-    %check to see if peak is too close to any edge
-    if p(1) <= distance || p(2) <= distance || x_lim-p(1) <=distance...
-            || y_lim-p(2) <=distance
-        peaksout(i,:)=0;
-        continue
-    end
-    %now check for the smallest distance in the distance matrix
-    if min(dist_m(i,:)) <= distance
-        peaksout(i,:)=0;
-    end
-end
+[X Y]=find(dist_m<=distance);
+peaksout(X,:)=0;
 %write the non-zero lines
 peaksout=peaksout(any(peaksout,2),:);
 end

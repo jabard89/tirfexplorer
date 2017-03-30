@@ -12,9 +12,12 @@ function [pindex]=indexPeaks(image_size,peaks,rinnercircle,routercircle)
 %pixels to score for intensity by pscore
 %%Load Parameters
 npeaks=size(peaks,1);
-pindex=cell(npeaks,2);
-for i =1:npeaks
-    [pindex{i,1} pindex{i,2}]=MakeCircle(image_size,peaks(i,1:2),...
-        rinnercircle,routercircle);
+nFrames=size(peaks,3);
+pindex=cell(npeaks,2,nFrames);
+for i=1:npeaks
+    for j=1:nFrames
+        [pindex{i,1,j} pindex{i,2,j}]=MakeCircle(image_size,peaks(i,1:2,j),...
+            rinnercircle,routercircle);
+    end
 end
 end

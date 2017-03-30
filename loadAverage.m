@@ -13,5 +13,5 @@ for i=start:stop
     image_temp=double(file_Tiff.read());
     image_avg=image_avg+image_temp./(stop-start+1);
 end
-imstruct=struct('avg',uint16(image_avg));
+imstruct=struct('avg',double(image_avg));
 end

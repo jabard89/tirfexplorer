@@ -60,6 +60,7 @@ handles.routercircle=6;
 handles.left_dim=[25 235 10 500];
 handles.right_dim=[269 479 9 499];
 handles.n_images=5;
+handles.alexToggle=0;
 % Update handles structure
 guidata(hObject, handles);
 
