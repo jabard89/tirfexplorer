@@ -22,7 +22,7 @@ function varargout = tirfexplorer_alex(varargin)
 
 % Edit the above text to modify the response to help tirfexplorer_alex
 
-% Last Modified by GUIDE v2.5 19-Mar-2017 22:25:53
+% Last Modified by GUIDE v2.5 29-Mar-2017 16:01:07
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -55,15 +55,40 @@ function tirfexplorer_alex_OpeningFcn(hObject, eventdata, handles, varargin)
 handles.output = hObject;
 
 %Set initial parameters
-handles.rinnercircle=3;
-handles.routercircle=6;
-handles.left_dim=[25 235 10 500];
+handles.rinnercircle=3; %circle around peak for data collection
+handles.routercircle=6; %donut around peak for background information
+handles.left_dim=[25 235 10 500]; %based on alignment of tetraspeck
 handles.right_dim=[269 479 9 499];
-handles.n_images=5;
-handles.alexToggle=0;
+handles.nImagesAvg=5; %how many averages to average for images
+handles.nImagesProcess=0; %frames to analyze (0=all)
+handles.alexToggle=0; %use a seperate channel for acceptor
+handles.driftToggle=0; %track a peak to calculate drift
+handles.maxPeaks=500; %maximum number of peaks to analyze
+handles.leftThresholdToggle=0; %0 uses a gui for thresholding.
+handles.rightThresholdToggle=0; %0 uses a gui for thresholding.
+
+%Load figure window
+handles.imageFigure=figure();
+handles.donorImageAxes=subplot(1,3,1);
+title('Donor')
+handles.fretImageAxes=subplot(1,3,2);
+title('FRET')
+handles.acceptorImageAxes=subplot(1,3,3);
+title('Acceptor')
+handles.traceFigure=figure();
+handles.donorTraceAxes=subplot(4,1,1);
+title('Donor Ch')
+handles.fretTraceAxes=subplot(4,1,2);
+title('FRET Ch')
+handles.acceptorTraceAxes=subplot(4,1,3);
+title('Acceptor Ch')
+handles.fretCalcAxes=subplot(4,1,4);
+title('Calc')
 
 % Update handles structure
 guidata(hObject, handles);
+
+
 
 % This sets up the initial plot - only do when we are invisible
 % so window can get raised using tirfexplorer_alex.
@@ -88,11 +113,26 @@ function pushbutton1_Callback(hObject, eventdata, handles)
 % hObject    handle to pushbutton1 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-axes(handles.axes1);
+
+%clear trace axes and listbox
+axes(handles.donorTraceAxes);
 cla;
-guidata(hObject,handles)
+axes(handles.acceptorTraceAxes);
+cla;
+axes(handles.fretTraceAxes);
+cla;
+axes(handles.fretCalcAxes);
+cla;
+axes(handles.donorImageAxes);
+cla;
+axes(handles.fretImageAxes);
+cla;
+axes(handles.acceptorImageAxes);
+cla;
+set(handles.listbox2,'String',{'No Points Detected'},'Value',1)
+
 if ~isfield(handles,'donorFile')
-    errordlg('Please select a tif movie file')
+    errordlg('Please select a donor tif movie file')
     return
 end
 
@@ -100,91 +140,182 @@ if ~isfield(handles,'tform')
     errordlg('Please load a map (use menu)')
     return
 end
-
 donorFile=handles.donorFile;
 if handles.alexToggle
+    if ~isfield(handles,'acceptorFile')
+        errrodlg('Please select an acceptor tif movie file')
+        return
+    end
     acceptorFile=handles.acceptorFile;
 end
-n_images=handles.n_images;
+
+nImagesAvg=handles.nImagesAvg;
+if handles.nImagesProcess==0
+    handles.nImagesProcess=length(imfinfo(donorFile));
+end
+nImagesProcess=handles.nImagesProcess;
+
 left_dim=handles.left_dim;
 right_dim=handles.right_dim;
-exp=loadAverage(donorFile,1,n_images);
+exp=loadAverage(donorFile,1,nImagesAvg);
 exp.avgl=exp.avg(left_dim(3):left_dim(4),left_dim(1):left_dim(2));
+exp.avgr=exp.avg(right_dim(3):right_dim(4),right_dim(1):right_dim(2));
 %If alex is turned on, also load an additional average for the other
 %channel
-exp.avgr=exp.avg(right_dim(3):right_dim(4),right_dim(1):right_dim(2));
 if handles.alexToggle
-    expAcceptor=loadAverage(acceptorFile,1,n_images);
+    expAcceptor=loadAverage(acceptorFile,1,nImagesAvg);
     expAcceptor.avgl=expAcceptor.avg(left_dim(3):left_dim(4),...
         left_dim(1):left_dim(2));
     expAcceptor.avgr=expAcceptor.avg(right_dim(3):right_dim(4),...
         right_dim(1):right_dim(2));
 end
-counter=-4;
-exp.lfilt=[];
-exp.rfilt=[];
-%dimensions=[x_start x_end y_start y_end]
-
-%First loop ask for threshhold, but use the same threshold for the
+%load arrays to store peak positions for every frame
+handles.maxPeaks=500;
+leftFilt=zeros(handles.maxPeaks,4,nImagesProcess);
+rightFilt=zeros(handles.maxPeaks,4,nImagesProcess);
+if handles.leftThresholdToggle
+    leftThreshold=handles.leftThresholdToggle;
+else
+    leftThreshold=0;
+end
+if handles.rightThresholdToggle
+    rightThreshold=handles.rightThresholdToggle;
+else
+    rightThreshold=0;
+end
+%On the first loop, ask for threshhold, but use the same threshold for the
 %remaining loops
-threshFlag=0;
-for i=1:floor(n_images/5)
-    counter=counter+5
-    %first load a moving average of the image
-    temp=loadAverage(donorFile,counter,counter+5);
+nRemainder=mod(nImagesProcess,5);
+if handles.driftToggle
+    if handles.refPeak
+        refPeak=handles.refPeak;
+        totalShift=[0 0];
+    else
+        errordlg('Please select a reference peak for drift correction')
+        return
+    end
+end
+%make five frame averages
+for cIm=1:5:nImagesProcess-nRemainder
+    cIm %report the image # being processed
+    
+    %Copy peaks from previous frames
+    if cIm>1
+        leftFilt(:,:,cIm:cIm+4)=repmat(leftFilt(:,:,cIm-1),1,1,5);
+        rightFilt(:,:,cIm:cIm+4)=repmat(rightFilt(:,:,cIm-1),1,1,5);
+    end
+    nLeftFilt=sum(leftFilt(:,1,cIm)~=0);
+    nRightFilt=sum(rightFilt(:,1,cIm)~=0);
+    %load a moving average of the image
+    temp=loadAverage(donorFile,cIm,cIm+4);
     temp.l=temp.avg(left_dim(3):left_dim(4),left_dim(1):left_dim(2));
     temp.r=temp.avg(right_dim(3):right_dim(4),right_dim(1):right_dim(2));
     if handles.alexToggle
-        tempAcceptor=loadAverage(acceptorFile,counter,counter+5);
+        tempAcceptor=loadAverage(acceptorFile,cIm,cIm+4);
         temp.r=tempAcceptor.avg(right_dim(3):right_dim(4),...
             right_dim(1):right_dim(2));
     end
+    %If driftToggle is on, then shift all peaks according to a reference
+    %peak
+    if cIm>1 && handles.driftToggle
+        switch handles.refChannel
+            case 'left'
+                refImage=temp.l;
+            case 'right'
+                refImage=temp.r;
+            otherwise
+                errordlg('Please choose a reference channel and peak')
+                return
+        end
+        shift=calcDrift(refPeak,refImage)
+        if isnan(shift)
+            errordlg('Shift is too large')
+            return
+        end
+        leftFilt(1:nLeftFilt,1:2,cIm:cIm+4)=...
+            leftFilt(1:nLeftFilt,1:2,cIm:cIm+4)+repmat(shift,nLeftFilt,1,5);
+        rightFilt(1:nRightFilt,1:2,cIm:cIm+4)=...
+            rightFilt(1:nRightFilt,1:2,cIm:cIm+4)+repmat(shift,nRightFilt,1,5);
+        refPeak=refPeak(1,1:2)+shift; %update the position of the ref
+        totalShift=totalShift+shift
+    end
+    
     %then find all the peaks in the image and filter them for crowding and
     %shape of the peak
-    if threshFlag
-        [temp.lp]=findPeaks(temp.l,lThresh);
-        [temp.rp]=findPeaks(temp.r,rThresh);
+    if leftThreshold
+        [temp.lp]=findPeaks(temp.l,leftThreshold);
     else
-        [temp.lp lThresh]=findPeaks(temp.l);
-        [temp.rp rThresh]=findPeaks(temp.r);
+        [temp.lp leftThreshold]=findPeaks(temp.l);
+        leftThreshold
+    end
+    if rightThreshold
+        [temp.rp]=findPeaks(temp.r,rightThreshold);
+    else
+        [temp.rp rightThreshold]=findPeaks(temp.r);
+        rightThreshold
     end
     temp.lfilt=filterPeaks(temp.l,temp.lp,10,2);
     temp.rfilt=filterPeaks(temp.r,temp.rp,10,2);
-    n_lfilt=size(exp.lfilt,1);
-    n_rfilt=size(exp.rfilt,1);
     %filter out new peaks from the temporary images by comparing against
     %the previous list
+    newPeakCounter=0;
     for j=1:size(temp.lfilt,1)
-        flag=1;
-        for k=1:n_lfilt
-            if pdist([temp.lfilt(j,1:2);exp.lfilt(k,1:2)]) < 5
-                flag=0;
-                break
+        %Check if peak is near another peak
+        nearPeaks=findNearPoints(temp.lfilt(j,1:2),...
+            squeeze(leftFilt(:,:,cIm)),5);
+        if isempty(nearPeaks)
+            newPeakCounter=newPeakCounter+1;
+            if nLeftFilt+newPeakCounter>handles.maxPeaks
+                errordlg('Too many left peaks found')
+                return
             end
-        end
-        %if it passes, add to the list of peaks
-        if flag==1
-            exp.lfilt=[exp.lfilt;temp.lfilt(j,:)];
+            leftFilt(nLeftFilt+newPeakCounter,:,cIm:cIm+4)=...
+                repmat(temp.lfilt(j,:),1,1,5);
         end
     end
+    newPeakCounter=0;
     for j=1:size(temp.rfilt,1)
-        flag=1;
-        for k=1:n_rfilt
-            if pdist([temp.rfilt(j,1:2);exp.rfilt(k,1:2)]) < 5
-                flag=0;
-                break
+        nearPeaks=findNearPoints(temp.rfilt(j,1:2),...
+            squeeze(rightFilt(:,:,cIm)),5);
+        if isempty(nearPeaks)
+            newPeakCounter=newPeakCounter+1;
+            if nRightFilt+newPeakCounter>handles.maxPeaks
+                errordlg('Too many right peaks found')
+                return
             end
-        end
-        if flag==1
-            exp.rfilt=[exp.rfilt;temp.rfilt(j,:)];
+            rightFilt(nRightFilt+newPeakCounter,:,cIm:cIm+4)=...
+                repmat(temp.rfilt(j,:),1,1,5);
         end
     end
     %report progress
-    temp
-    size(exp.lfilt)
-    size(exp.rfilt)
-    threshFlag=1;
+    nLeftFilt=sum(leftFilt(:,1,cIm)~=0)
+    nRightFilt=sum(rightFilt(:,1,cIm)~=0)
 end
+%Fill out peaks with last few frames if not divisible by 5
+nRemainder=mod(nImagesProcess,5);
+if nRemainder>0
+    cIm=cIm+5;
+    leftFilt(:,:,cIm:cIm+nRemainder-1)=...
+        repmat(leftFilt(:,:,cIm-1),1,1,nRemainder);
+    rightFilt(:,:,cIm:cIm+nRemainder-1)=...
+        repmat(rightFilt(:,:,cIm-1),1,1,nRemainder);
+end
+%Squeeze the peak array down
+%First remove all rows that don't have any peaks at any point
+leftFilt(nLeftFilt+1:end,:,:)=[];
+rightFilt(nRightFilt+1:end,:,:)=[];
+%Now go through each row, find when that peak started, and carry it through
+%to the beginning of the trace
+for i=1:nLeftFilt
+    firstFrame=find(leftFilt(i,1,:),1);
+    leftFilt(i,:,1:firstFrame)=repmat(leftFilt(i,:,firstFrame),1,1,firstFrame);
+end
+for i=1:nRightFilt
+    firstFrame=find(rightFilt(i,1,:),1);
+    rightFilt(i,:,1:firstFrame)=repmat(rightFilt(i,:,firstFrame),1,1,firstFrame);
+end
+exp.lfilt=leftFilt;
+exp.rfilt=rightFilt;
 %find matching pairs between the two channels
 [exp.linknames exp.linki exp.linked_lpeaks exp.linked_rpeaks]=...
     linkPeaks(handles.tform,exp.lfilt,exp.rfilt,4);
@@ -197,26 +328,30 @@ set(handles.listbox2,'String',handles.exp.linknames)
 guidata(hObject,handles);
 
 %Plot peaks on images
-axes(handles.axes2);
+axes(handles.donorImageAxes);
 imshow(exp.avgl,[])
 hold on
 plot(exp.lfilt(:,1),exp.lfilt(:,2),'yo')
 plot(exp.linked_lpeaks(:,1),exp.linked_lpeaks(:,2),'ro')
 hold off
-axes(handles.axes3);
+axes(handles.fretImageAxes);
 imshow(exp.avgr,[])
 hold on
 plot(exp.rfilt(:,1),exp.rfilt(:,2),'yo')
 plot(exp.linked_rpeaks(:,1),exp.linked_rpeaks(:,2),'ro')
 hold off
 if handles.alexToggle
-    axes(handles.axes6);
+    axes(handles.acceptorImageAxes);
     imshow(expAcceptor.avgr,[])
     hold on
     plot(exp.rfilt(:,1),exp.rfilt(:,2),'yo')
     plot(exp.linked_rpeaks(:,1),exp.linked_rpeaks(:,2),'ro')
     hold off
 end
+if handles.driftToggle
+    highlightPeak(handles,handles.refChannel,handles.refPeak,'g+');
+end
+setAxesProperties(handles)
 finished='yes'
 
 % --------------------------------------------------------------------
@@ -258,31 +393,6 @@ end
 delete(handles.figure1)
 
 
-% --- Executes on selection change in popupmenu1.
-function popupmenu1_Callback(hObject, eventdata, handles)
-% hObject    handle to popupmenu1 (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: contents = get(hObject,'String') returns popupmenu1 contents as cell array
-%        contents{get(hObject,'Value')} returns selected item from popupmenu1
-
-
-% --- Executes during object creation, after setting all properties.
-function popupmenu1_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to popupmenu1 (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: popupmenu controls usually have a white background on Windows.
-%       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-     set(hObject,'BackgroundColor','white');
-end
-
-set(hObject, 'String', {'plot(rand(5))', 'plot(sin(1:0.01:25))', 'bar(1:.5:10)', 'plot(membrane)', 'surf(peaks)'});
-
-
 % --- Executes on button press in pushbutton2.
 function pushbutton2_Callback(hObject, eventdata, handles)
 % hObject    handle to pushbutton2 (see GCBO)
@@ -292,9 +402,8 @@ filename='';
 pathname='';
 [filename, pathname]=uigetfile('*.tif','Open Tirf','E:\Martin\Data\TIRF!');
 handles.donorFile=[pathname filename];
-set(handles.text1,'String',filename);
 guidata(hObject,handles);
-
+set(handles.text1,'String',filename);
 
 % --- Executes on button press in pushbutton3.
 function pushbutton3_Callback(hObject, eventdata, handles)
@@ -320,37 +429,10 @@ function pushbutton4_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 %[point(1) point(2)]=ginputc(1,'Color','r');
-[x_p y_p]=getpts(handles.axes2);
-channel_dim=handles.left_dim;
-win_dim=[channel_dim(2)-channel_dim(1) channel_dim(4)-channel_dim(3)];
-%make sure correct point is selected
-if size(x_p,1) > 1
-    msgbox('Pick Only One Point')
-    return
-elseif x_p > win_dim(1) || y_p > win_dim(2)
-    msgbox('Pick a Point in the Correct Channel')
-    return
-end
-
-p_box=[x_p-3 y_p-3;x_p+3 y_p+3];
-%load peak list
-list=handles.exp.lfilt;
-%Find nearest peak using sequential search
-near=list(find(list(:,1)>p_box(1,1)),:);
-near=near(find(near(:,1)<p_box(2,1)),:);
-near=near(find(near(:,2)>p_box(1,2)),:);
-near=near(find(near(:,2)<p_box(2,2)),:);
-if size(near,1) > 1
-    msgbox('Too many points')
-    return
-elseif size(near,1) < 1
-    msgbox('No point selected')
-    return
-end
-%Export peak name to handles
-[found peakl_i]=ismember(near,list,'rows');
-handles.peakl_i=peakl_i;
-handles=plotPoint2(handles,'left',near);
+[peakPicked peakIndex]=pickPoint(handles.donorImageAxes,handles.left_dim,...
+    handles.exp.lfilt);
+handles.peakl_i=peakIndex;
+handles=plotPoint2(handles,'left',peakPicked);
 guidata(hObject,handles)
 
 % --- Executes on button press in pushbutton5.
@@ -359,108 +441,29 @@ function pushbutton5_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 if handles.alexToggle
-    [x_p y_p]=getpts(handles.axes6);
+    ax1=handles.acceptorImageAxes;
 else
-    [x_p y_p]=getpts(handles.axes3);
+    ax1=handles.fretImageAxes;
 end
-channel_dim=handles.right_dim;
-win_dim=[channel_dim(2)-channel_dim(1) channel_dim(4)-channel_dim(3)];
-%make sure correct point is selected
-if size(x_p,1) > 1
-    msgbox('Pick Only One Point')
-    return
-elseif x_p > win_dim(1) || y_p > win_dim(2)
-    msgbox('Pick a Point in the Correct Channel')
-    return
-end
-
-p_box=[x_p-3 y_p-3;x_p+3 y_p+3];
-%load peak list
-list=handles.exp.rfilt;
-%Find nearest peak using sequential search
-near=list(find(list(:,1)>p_box(1,1)),:);
-near=near(find(near(:,1)<p_box(2,1)),:);
-near=near(find(near(:,2)>p_box(1,2)),:);
-near=near(find(near(:,2)<p_box(2,2)),:);
-if size(near,1) > 1
-    error('Too many points')
-elseif size(near,1) < 1
-    error('No point selected')
-end
-[found peakr_i]=ismember(near,list,'rows');
-handles.peakr_i=peakr_i;
-handles=plotPoint2(handles,'right',near);
+[peakPicked peakIndex]=pickPoint(ax1,handles.right_dim,...
+    handles.exp.rfilt);
+handles.peakr_i=peakIndex;
+handles=plotPoint2(handles,'right',peakPicked);
 guidata(hObject,handles)
 
-% --- Executes on button press in pushbutton6.
-function pushbutton6_Callback(hObject, eventdata, handles)
-% hObject    handle to pushbutton6 (see GCBO)
+% --- Executes on button press in plotDonorAcceptorButton.
+function plotDonorAcceptorButton_Callback(hObject, eventdata, handles)
+% hObject    handle to plotDonorAcceptorButton (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 %Calculate Relative traces
-ltrace=squeeze(handles.ltrace{1});
-rtrace=squeeze(handles.rAcceptortraces{1});
-lt=ltrace(2,:)-ltrace(3,:);
-rt=rtrace(2,:)-rtrace(3,:);
-%scale lt and rt to min and max
-lt_s=lt./max(lt);
-rt_s=rt./max(rt);
-axes(handles.axes5);
-len=length(ltrace);
-hold off
-plot(1:len,lt_s)
-axis([0 len 0 1]);
-hold on
-plot(1:len,rt_s)
-legend({'Cy3','Cy5'})
-
-
-
-function edit1_Callback(hObject, eventdata, handles)
-% hObject    handle to edit1 (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-%Edit box for controlling how many images get averaged
-n_images=str2num(get(hObject,'String'));
-handles.n_images=n_images;
-guidata(hObject,handles);
-% Hints: get(hObject,'String') returns contents of edit1 as text
-%        str2double(get(hObject,'String')) returns contents of edit1 as a double
-
-
-% --- Executes during object creation, after setting all properties.
-function edit1_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to edit1 (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: edit controls usually have a white background on Windows.
-%       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-    set(hObject,'BackgroundColor','white');
+if ~handles.alexToggle
+    error('Please turn on Alex to use this setting')
+    return
 end
-
-% --- Executes on selection change in popupmenu3.
-function popupmenu3_Callback(hObject, eventdata, handles)
-% hObject    handle to popupmenu3 (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: contents = cellstr(get(hObject,'String')) returns popupmenu3 contents as cell array
-%        contents{get(hObject,'Value')} returns selected item from popupmenu3
-
-
-% --- Executes during object creation, after setting all properties.
-function popupmenu3_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to popupmenu3 (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: popupmenu controls usually have a white background on Windows.
-%       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-    set(hObject,'BackgroundColor','white');
-end
+lTrace=squeeze(handles.ltrace{1});
+rTrace=squeeze(handles.rAcceptortraces{1});
+plotFret(handles.fretCalcAxes,lTrace,rTrace,0);
 
 
 % --- Executes on selection change in listbox2.
@@ -471,12 +474,11 @@ function listbox2_Callback(hObject, eventdata, handles)
 
 % Hints: contents = cellstr(get(hObject,'String')) returns listbox2 contents as cell array
 %        contents{get(hObject,'Value')} returns selected item from listbox2
-a='apple';
 peak_i=get(hObject,'Value');
 handles.peakl_i=peak_i;
 handles.peakr_i=peak_i;
-peak1=handles.exp.linked_lpeaks(peak_i,1:2);
-peak2=handles.exp.linked_rpeaks(peak_i,1:2);
+peak1=handles.exp.linked_lpeaks(peak_i,:,:);
+peak2=handles.exp.linked_rpeaks(peak_i,:,:);
 handles.peak1=peak1;
 handles.peak2=peak2;
 handles=plotPoint2(handles,'both',peak1,peak2);
@@ -496,66 +498,6 @@ end
 linknames='No Peaks Detected';
 set(hObject,'String',linknames);
 
-function edit4_Callback(hObject, eventdata, handles)
-% hObject    handle to edit4 (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of edit4 as text
-%        str2double(get(hObject,'String')) returns contents of edit4 as a double
-left_string=strsplit(get(hObject,'String'));
-left_dim=[25 235 10 500];
-for i=1:4
-    left_dim(i)=str2num(left_string{i});
-end
-handles.left_dim=left_dim;
-guidata(hObject,handles);
-
-% --- Executes during object creation, after setting all properties.
-function edit4_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to edit4 (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: edit controls usually have a white background on Windows.
-%       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-    set(hObject,'BackgroundColor','white');
-end
-% --------------------------------------------------------------------
-function Untitled_1_Callback(hObject, eventdata, handles)
-% hObject    handle to Untitled_1 (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-
-
-function edit6_Callback(hObject, eventdata, handles)
-% hObject    handle to edit6 (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
-% Hints: get(hObject,'String') returns contents of edit6 as text
-%        str2double(get(hObject,'String')) returns contents of edit6 as a double
-right_string=strsplit(get(hObject,'String'));
-right_dim=[269 479 9 499];
-for i=1:4
-    right_dim(i)=str2num(right_string{i});
-end
-handles.right_dim=right_dim;
-guidata(hObject,handles);
-
-% --- Executes during object creation, after setting all properties.
-function edit6_CreateFcn(hObject, eventdata, handles)
-% hObject    handle to edit6 (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    empty - handles not created until after all CreateFcns called
-
-% Hint: edit controls usually have a white background on Windows.
-%       See ISPC and COMPUTER.
-if ispc && isequal(get(hObject,'BackgroundColor'), get(0,'defaultUicontrolBackgroundColor'))
-    set(hObject,'BackgroundColor','white');
-end
 
 % --------------------------------------------------------------------
 function export_t_Callback(hObject, eventdata, handles)
@@ -565,13 +507,18 @@ function export_t_Callback(hObject, eventdata, handles)
 %Exports the current left and right traces as objects to the workspace
 if isfield(handles,'ltrace')
     ltrace=squeeze(handles.ltrace{1});
-    peak_lname=inputdlg('Name the Left Peak');
+    peak_lname=inputdlg('Name the Left Trace');
     assignin('base',peak_lname{1},ltrace);
 end
 if isfield(handles,'rtrace')
     rtrace=squeeze(handles.rtrace{1});
-    peak_rname=inputdlg('Name the Right Peak');
+    peak_rname=inputdlg('Name the Right Trace');
     assignin('base',peak_rname{1},rtrace);
+end
+if isfield(handles,'rAcceptorTraces')
+    acceptorTrace=squeeze(handles.rAcceptorTraces{1});
+    peak_acceptorname=inputdlg('Name the Acceptor Trace');
+    assignin('base',peak_acceptorname{1},acceptorTrace);
 end
 
 
@@ -586,17 +533,32 @@ function export_all_Callback(hObject, eventdata, handles)
 %pScore_output follows this format:
 %[Total_Peak_intensity (signal minus noise), avg_peak_intensity (average
 %signal), avg_bkgd_intensity, peak_size, background_size]
-linked_traces=tracemovie_tif_dim(handles.file,handles.rinnercircle,...
+linked_traces=tracemovie(handles.donorFile,handles.rinnercircle,...
     handles.routercircle,2,handles.exp.linked_lpeaks,handles.left_dim,...
     handles.exp.linked_rpeaks,handles.right_dim);
 exp=handles.exp;
 exp.linked_ltraces=linked_traces{1};
 exp.linked_rtraces=linked_traces{2};
-exp_name=inputdlg('Name the Exp File');
+exp_name=inputdlg('Name the Donor Exp File');
 assignin('base',exp_name{1},exp);
+
+if handles.alexToggle
+    allAcceptorTraces=tracemovie(handles.acceptorFile,handles.rinnercircle,...
+        handles.routercircle,1,handles.exp.linked_rpeaks,handles.right_dim);
+    expAcceptor=handles.expAcceptor;
+    expAcceptor.allAcceptorTraces=allAcceptorTraces;
+    expNameAcceptor=inputdlg('Name the Acceptor Exp File');
+    assignin('base',expNameAcceptor{1},exp);
+end
 
 
 % --------------------------------------------------------------------
+function Untitled_1_Callback(hObject, eventdata, handles)
+% hObject    handle to Untitled_2 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)%
+
+%--------------------------------------------------------------------
 function Untitled_2_Callback(hObject, eventdata, handles)
 % hObject    handle to Untitled_2 (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
@@ -662,17 +624,17 @@ function change_right_dim_Callback(hObject, eventdata, handles)
 right_dim_msg=sprintf('%s%s%s\n%s','Current Right Dimensions (X_min X_max Y_min Y_max): ['...
     ,num2str(handles.right_dim),']','Change to:');
 right_string=inputdlg(right_dim_msg);
-handles.left_dim=str2num(right_string{1});
+handles.right_dim=str2num(right_string{1});
 guidata(hObject,handles);
 % --------------------------------------------------------------------
-function change_nimages_Callback(hObject, eventdata, handles)
-% hObject    handle to change_nimages (see GCBO)
+function nImagesAvgButton_Callback(hObject, eventdata, handles)
+% hObject    handle to nImagesAvgButton (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 n_images_msg=sprintf('%s%s%s\n%s','Current # of images to average is: '...
-    ,num2str(handles.n_images),'.','Change to:');
+    ,num2str(handles.nImagesAvg),'.','Change to:');
 n_images_string=inputdlg(n_images_msg);
-handles.n_images=str2num(n_images_string{1});
+handles.nImagesAvg=str2num(n_images_string{1});
 guidata(hObject,handles);
 
 
@@ -685,17 +647,28 @@ left_dim_msg=sprintf('%s%s%s','Current Left Dimensions (X_min X_max Y_min Y_max)
     ,num2str(handles.left_dim),']');
 right_dim_msg=sprintf('%s%s%s','Current Right Dimensions (X_min X_max Y_min Y_max): ['...
     ,num2str(handles.right_dim),']');
-n_images_msg=sprintf('%s%s%s','Current # of images to average is: '...
-    ,num2str(handles.n_images),'.');
+nImagesAvg_msg=sprintf('%s%s%s','Current # of images to average is: '...
+    ,num2str(handles.nImagesAvg),'.');
+nImagesProcess_msg=sprintf('%s%s%s',['Current # of images to process is'...
+    ' (0 defaults to entire movie): '],num2str(handles.nImagesProcess),'.');
 rinnercircle_msg=sprintf('%s%d%s','Current rinnercircle (peak size) is: '...
     ,handles.rinnercircle,'.');
 routercircle_msg=sprintf('%s%d%s',...
     'Current routercircle (bkgd doughnut size) is: '...
     ,handles.routercircle,'.');
-alexToggle_msg=sprintf('%s%d%s','Currently alexToggle is set to: '...
-    ,handles.alexToggle,'.');
-msgbox({left_dim_msg,right_dim_msg,n_images_msg,rinnercircle_msg,...
-    routercircle_msg,alexToggle_msg});
+alexToggleMsg=sprintf('%s%d','Currently the Alex Toggle (0 is off, 1 is on) is set to: ',...
+    handles.alexToggle);
+driftToggleMsg=sprintf('%s%d','Currently the Drift Correction Toggle (0 is off, 1 is on) is set to: ',...
+   handles.driftToggle);
+maxPeaksMsg=sprintf('%s%d','Currently the maximum # of peaks is set to: ',...
+    handles.maxPeaks);
+leftThresholdMsg=sprintf('%s%d','Currently the Left Threshold is set to: ',...
+    handles.leftThresholdToggle);
+rightThresholdMsg=sprintf('%s%d','Currently the Right Threshold is set to: ',...
+    handles.rightThresholdToggle);
+msgbox({left_dim_msg,right_dim_msg,'',nImagesAvg_msg,nImagesProcess_msg,'',...
+    rinnercircle_msg,routercircle_msg,'',alexToggleMsg,driftToggleMsg,maxPeaksMsg,...
+    leftThresholdMsg,rightThresholdMsg});
 
 
 % --- Executes on button press in pushbutton7.
@@ -720,3 +693,184 @@ alexToggleMsg=sprintf('%s%s%s\n%s',['Toggle ALEX On (1) or Off (0).'...
 alexToggleString=inputdlg(alexToggleMsg);
 handles.alexToggle=str2num(alexToggleString{1});
 guidata(hObject,handles);
+
+
+% --------------------------------------------------------------------
+function driftToggleButton_Callback(hObject, eventdata, handles)
+% hObject    handle to driftToggleButton (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+driftToggleMsg=sprintf('%s%s%s\n%s',['Toggle Drift Correction On (1) or Off (0).'...
+    'Current state is: '],num2str(handles.driftToggle),'.','Change to:');
+driftToggleString=inputdlg(driftToggleMsg);
+handles.driftToggle=str2num(driftToggleString{1});
+guidata(hObject,handles);
+
+
+% --------------------------------------------------------------------
+function nImagesProcessButton_Callback(hObject, eventdata, handles)
+% hObject    handle to nImagesProcessButton (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+n_images_msg=sprintf('%s%s%s\n%s',['Current # of images to process is'...
+    ' (0 defaults to entire movie): '],num2str(handles.nImagesProcess),...
+    '.','Change to:');
+n_images_string=inputdlg(n_images_msg);
+handles.nImagesProcess=str2num(n_images_string{1});
+guidata(hObject,handles);
+
+
+% --------------------------------------------------------------------
+function refPeakButton_Callback(hObject, eventdata, handles)
+% hObject    handle to refPeakButton (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+refPeak_msg=sprintf('%s\n%s',...
+    'Current Reference Peak is highlight in red.',...
+    'Which channel would you like to select from? (left or right)');
+refChannel=inputdlg(refPeak_msg);
+refChannel=refChannel{1};
+handles.refChannel=refChannel;
+switch refChannel
+    case 'left'
+        ax=handles.donorImageAxes;
+        channelDim=handles.left_dim;
+        peakList=handles.exp.lfilt(:,:,1);
+    case 'right'
+        channelDim=handles.right_dim;
+        peakList=handles.exp.rfilt(:,:,1);
+        if handles.alexToggle
+            ax=handles.acceptorImageAxes;
+        else
+            ax=handles.fretImageAxes;
+        end
+    otherwise
+        errordlg('Please pick either left or right')
+        return
+end
+[refPeak i]=pickPoint(ax,channelDim,peakList);
+handles.refPeak=refPeak;
+highlightPeak(handles,refChannel,refPeak,'g+');
+guidata(hObject,handles);
+
+
+% --- Executes on button press in plotDonorFretButton.
+function plotDonorFretButton_Callback(hObject, eventdata, handles)
+% hObject    handle to plotDonorFretButton (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+lTrace=squeeze(handles.ltrace{1});
+rTrace=squeeze(handles.rtrace{1});
+plotFret(handles.fretCalcAxes,lTrace,rTrace,0);
+
+% --- Executes on button press in calcFretButton.
+function calcFretButton_Callback(hObject, eventdata, handles)
+% hObject    handle to calcFretButton (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --------------------------------------------------------------------
+function setLeftThresholdButton_Callback(hObject, eventdata, handles)
+% hObject    handle to setLeftThresholdButton (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+leftThresholdToggleMsg=sprintf('%s%s%s\n%s',['Set left threshold by entering a value >0. '...
+    'A value of 0 uses a gui to set threshold. '...
+    'Current left threshold is: '],num2str(handles.leftThresholdToggle),'.','Change to:');
+leftThresholdToggleString=inputdlg(leftThresholdToggleMsg);
+handles.leftThresholdToggle=str2num(leftThresholdToggleString{1});
+guidata(hObject,handles);
+
+
+% --------------------------------------------------------------------
+function setRightThresholdButton_Callback(hObject, eventdata, handles)
+% hObject    handle to setRightThresholdButton (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+rightThresholdToggleMsg=sprintf('%s%s%s\n%s',['Set right threshold by entering a value >0. '...
+    'A value of 0 uses a gui to set threshold. '...
+    'Current right threshold is: '],num2str(handles.rightThresholdToggle),'.','Change to:');
+rightThresholdToggleString=inputdlg(rightThresholdToggleMsg);
+handles.rightThresholdToggle=str2num(rightThresholdToggleString{1});
+guidata(hObject,handles);
+
+
+% --------------------------------------------------------------------
+function Untitled_5_Callback(hObject, eventdata, handles)
+% hObject    handle to Untitled_5 (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+
+% --------------------------------------------------------------------
+function plotIndicesButton_Callback(hObject, eventdata, handles)
+% hObject    handle to plotIndicesButton (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+'Plotting Indices'
+leftXStart=handles.left_dim(1);
+leftXEnd=handles.left_dim(2);
+leftYStart=handles.left_dim(3);
+leftYEnd=handles.left_dim(4);
+rightXStart=handles.right_dim(1);
+rightXEnd=handles.right_dim(2);
+rightYStart=handles.right_dim(3);
+rightYEnd=handles.right_dim(4);
+if ~isfield(handles,'peakl_i') || ~isfield(handles,'peakr_i')
+    errordlg('Please select a left and right peak')
+    return
+end
+exp=handles.exp;
+if handles.peakl_i
+    leftPeakIndex=handles.peakl_i;
+else
+    leftPeakIndex=1;
+end
+if handles.peakr_i
+    rightPeakIndex=handles.peakr_i;
+else
+    rightPeakIndex=1;
+end
+leftPeakIndices=indexPeaks([(leftYEnd-leftYStart+1) (leftXEnd-leftXStart+1)]...
+    ,exp.linked_lpeaks(leftPeakIndex,:),handles.rinnercircle,handles.routercircle);
+axes(handles.donorImageAxes);
+hold on
+for i=1:size(leftPeakIndices,1)
+    i
+    ind=leftPeakIndices{i,1,1};
+    [y x]=ind2sub(size(exp.avgl),ind);
+    p=scatter(x,y,'r.');
+    p.MarkerEdgeAlpha=0.4;
+end
+
+for i=1:size(leftPeakIndices,1)
+    i
+    ind=leftPeakIndices{i,2,1};
+    [y x]=ind2sub(size(exp.avgl),ind);
+    p=scatter(x,y,'g.');
+    p.MarkerEdgeAlpha=0.4;
+end
+hold off
+
+rightPeakIndices=indexPeaks([(rightYEnd-rightYStart+1) (rightXEnd-rightXStart+1)]...
+    ,exp.linked_rpeaks(rightPeakIndex,:),handles.rinnercircle,handles.routercircle);
+axes(handles.fretImageAxes);
+hold on
+for i=1:size(rightPeakIndices,1)
+    ind=rightPeakIndices{i,1,1};
+    [y x]=ind2sub(size(exp.avgr),ind);
+    p=scatter(x,y,'r.');
+    p.MarkerEdgeAlpha=0.4;
+end
+
+for i=1:size(rightPeakIndices,1)
+    ind=rightPeakIndices{i,2,1};
+    [y x]=ind2sub(size(exp.avgr),ind);
+    p=scatter(x,y,'g.');
+    p.MarkerEdgeAlpha=0.4;
+end
+drawnow
+hold off
+setAxesProperties(handles);
+'Done Plotting'
