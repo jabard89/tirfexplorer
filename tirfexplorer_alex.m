@@ -22,7 +22,7 @@ function varargout = tirfexplorer_alex(varargin)
 
 % Edit the above text to modify the response to help tirfexplorer_alex
 
-% Last Modified by GUIDE v2.5 29-Mar-2017 16:01:07
+% Last Modified by GUIDE v2.5 09-Nov-2017 15:44:59
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -325,8 +325,13 @@ if handles.alexToggle
 end
 %Update the list of peaks
 set(handles.listbox2,'String',handles.exp.linknames)
-guidata(hObject,handles);
 
+%make movies of channels
+handles.donorMovie=makeMovie(donorFile,nImagesProcess,left_dim);
+handles.fretMovie=makeMovie(donorFile,nImagesProcess,right_dim);
+if handles.alexToggle
+    handles.acceptorMovie=makeMovie(acceptorFile,nImagesProcess,right_dim);
+end
 %Plot peaks on images
 axes(handles.donorImageAxes);
 imshow(exp.avgl,[])
@@ -352,6 +357,7 @@ if handles.driftToggle
     highlightPeak(handles,handles.refChannel,handles.refPeak,'g+');
 end
 setAxesProperties(handles)
+guidata(hObject,handles);
 finished='yes'
 
 % --------------------------------------------------------------------
@@ -797,8 +803,8 @@ guidata(hObject,handles);
 
 
 % --------------------------------------------------------------------
-function Untitled_5_Callback(hObject, eventdata, handles)
-% hObject    handle to Untitled_5 (see GCBO)
+function toolButton_Callback(hObject, eventdata, handles)
+% hObject    handle to toolButton (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
@@ -874,3 +880,153 @@ drawnow
 hold off
 setAxesProperties(handles);
 'Done Plotting'
+
+
+% --------------------------------------------------------------------
+function playMoviesButton_Callback(hObject, eventdata, handles)
+% hObject    handle to playMoviesButton (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+%first clear previous movies
+if isfield(handles,'donorMovieHandle')
+    if isvalid(handles.donorMovieHandle)
+        close(handles.donorMovieHandle);
+    end
+    if isvalid(handles.fretMovieHandle);
+        close(handles.fretMovieHandle);
+    end
+    if handles.alexToggle
+        if isvalid(handles.acceptorMovieHandle)
+            close(handles.acceptorMovieHandle);
+        end
+    end
+end
+exp=handles.exp;
+fps=4;
+
+%Load Current Highlighted Peaks
+leftPeak=0;
+rightPeak=0;
+if isfield(handles,'peakl_i')
+    leftPeak=handles.exp.linked_lpeaks(handles.peakl_i,:,:);
+end
+
+if isfield(handles,'peakr_i')
+    rightPeak=handles.exp.linked_rpeaks(handles.peakr_i,:,:);
+end
+
+%Open a separate figure for each channel and overlay the peaks
+donorMovieHandle=implay(handles.donorMovie,fps);
+donorMovieHandle.Parent.Name='Donor Channel';
+%Plot Peaks
+axes(donorMovieHandle.Parent.CurrentAxes)
+hold on
+plot(exp.lfilt(:,1),exp.lfilt(:,2),'yo')
+plot(exp.linked_lpeaks(:,1),exp.linked_lpeaks(:,2),'ro')
+if leftPeak
+    plot(leftPeak(1),leftPeak(2),'go')
+end
+hold off
+
+fretMovieHandle=implay(handles.fretMovie,fps);
+fretMovieHandle.Parent.Name='FRET Channel';
+%Plot Peaks
+axes(fretMovieHandle.Parent.CurrentAxes)
+hold on
+plot(exp.rfilt(:,1),exp.rfilt(:,2),'yo')
+plot(exp.linked_rpeaks(:,1),exp.linked_rpeaks(:,2),'ro')
+if rightPeak
+    plot(rightPeak(1),rightPeak(2),'go')
+end
+hold off
+
+if handles.alexToggle
+    acceptorMovieHandle=implay(handles.acceptorMovie,fps);
+    acceptorMovieHandle.Parent.Name='Acceptor Channel';
+    %Plot Peaks
+    axes(acceptorMovieHandle.Parent.CurrentAxes)
+    hold on
+    plot(exp.rfilt(:,1),exp.rfilt(:,2),'yo')
+    plot(exp.linked_rpeaks(:,1),exp.linked_rpeaks(:,2),'ro')
+    if rightPeak
+        plot(rightPeak(1),rightPeak(2),'go')
+    end
+    hold off
+end
+handles.donorMovieHandle=donorMovieHandle;
+handles.fretMovieHandle=fretMovieHandle;
+if handles.alexToggle
+    handles.acceptorMovieHandle=acceptorMovieHandle;
+end
+guidata(hObject,handles)
+
+
+% --------------------------------------------------------------------
+function updateMovieButton_Callback(hObject, eventdata, handles)
+% hObject    handle to updateMovieButton (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+
+%This button replots the peaks onto the movies without closing and
+%reopening the windows
+%Load Current Highlighted Peaks
+if ~isvalid(handles.donorMovieHandle) || ~isvalid(handles.fretMovieHandle)
+    errordlg('Please reopen all movies using the Play Movies menu button')
+    return
+end
+if handles.alexToggle
+    if ~isvalid(handles.acceptorMovieHandle)
+    errordlg('Please reopen all movies using the Play Movies menu button')
+    return
+    end
+end
+exp=handles.exp;
+leftPeak=0;
+rightPeak=0;
+if isfield(handles,'peakl_i')
+    leftPeak=handles.exp.linked_lpeaks(handles.peakl_i,:,:);
+end
+
+if isfield(handles,'peakr_i')
+    rightPeak=handles.exp.linked_rpeaks(handles.peakr_i,:,:);
+end
+
+%Open a separate figure for each channel and overlay the peaks
+donorMovieHandle=handles.donorMovieHandle;
+donorMovieHandle.Parent.Name='Donor Channel';
+%Plot Peaks
+axes(donorMovieHandle.Parent.CurrentAxes);
+hold on
+plot(exp.lfilt(:,1),exp.lfilt(:,2),'yo')
+plot(exp.linked_lpeaks(:,1),exp.linked_lpeaks(:,2),'ro')
+if leftPeak
+    plot(leftPeak(1),leftPeak(2),'go')
+end
+hold off
+
+fretMovieHandle=handles.fretMovieHandle;
+fretMovieHandle.Parent.Name='FRET Channel';
+%Plot Peaks
+axes(fretMovieHandle.Parent.CurrentAxes);
+hold on
+plot(exp.rfilt(:,1),exp.rfilt(:,2),'yo')
+plot(exp.linked_rpeaks(:,1),exp.linked_rpeaks(:,2),'ro')
+if rightPeak
+    plot(rightPeak(1),rightPeak(2),'go')
+end
+hold off
+
+if handles.alexToggle
+    acceptorMovieHandle=handles.acceptorMovieHandle;
+    acceptorMovieHandle.Parent.Name='Acceptor Channel';
+    %Plot Peaks
+    axes(acceptorMovieHandle.Parent.CurrentAxes);
+    hold on
+    plot(exp.rfilt(:,1),exp.rfilt(:,2),'yo')
+    plot(exp.linked_rpeaks(:,1),exp.linked_rpeaks(:,2),'ro')
+    if rightPeak
+        plot(rightPeak(1),rightPeak(2),'go')
+    end
+    hold off
+end
