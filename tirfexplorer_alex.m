@@ -22,7 +22,11 @@ function varargout = tirfexplorer_alex(varargin)
 
 % Edit the above text to modify the response to help tirfexplorer_alex
 
+<<<<<<< HEAD
 % Last Modified by GUIDE v2.5 09-Nov-2017 15:44:59
+=======
+% Last Modified by GUIDE v2.5 29-Mar-2017 16:01:07
+>>>>>>> parent of 6da2d62... Add a function to watch movies of the traces (under tools)
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -325,6 +329,7 @@ if handles.alexToggle
 end
 %Update the list of peaks
 set(handles.listbox2,'String',handles.exp.linknames)
+<<<<<<< HEAD
 
 %make movies of channels
 handles.donorMovie=makeMovie(donorFile,nImagesProcess,left_dim);
@@ -332,6 +337,10 @@ handles.fretMovie=makeMovie(donorFile,nImagesProcess,right_dim);
 if handles.alexToggle
     handles.acceptorMovie=makeMovie(acceptorFile,nImagesProcess,right_dim);
 end
+=======
+guidata(hObject,handles);
+
+>>>>>>> parent of 6da2d62... Add a function to watch movies of the traces (under tools)
 %Plot peaks on images
 axes(handles.donorImageAxes);
 imshow(exp.avgl,[])
@@ -357,7 +366,10 @@ if handles.driftToggle
     highlightPeak(handles,handles.refChannel,handles.refPeak,'g+');
 end
 setAxesProperties(handles)
+<<<<<<< HEAD
 guidata(hObject,handles);
+=======
+>>>>>>> parent of 6da2d62... Add a function to watch movies of the traces (under tools)
 finished='yes'
 
 % --------------------------------------------------------------------
@@ -803,8 +815,13 @@ guidata(hObject,handles);
 
 
 % --------------------------------------------------------------------
+<<<<<<< HEAD
 function toolButton_Callback(hObject, eventdata, handles)
 % hObject    handle to toolButton (see GCBO)
+=======
+function Untitled_5_Callback(hObject, eventdata, handles)
+% hObject    handle to Untitled_5 (see GCBO)
+>>>>>>> parent of 6da2d62... Add a function to watch movies of the traces (under tools)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
@@ -879,6 +896,7 @@ end
 drawnow
 hold off
 setAxesProperties(handles);
+<<<<<<< HEAD
 'Done Plotting'
 
 
@@ -1030,3 +1048,6 @@ if handles.alexToggle
     end
     hold off
 end
+=======
+'Done Plotting'
+>>>>>>> parent of 6da2d62... Add a function to watch movies of the traces (under tools)
