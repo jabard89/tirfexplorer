@@ -7,9 +7,10 @@ hold off
 axes(handles.fretImageAxes)
 title('FRET')
 hold off
-axes(handles.acceptorImageAxes)
-title('Acceptor')
+axes(handles.acceptorImageAxes);
+title('Acceptor');
 hold off
+    
 axes(handles.donorTraceAxes)
 title('Donor Ch')
 hold off
@@ -19,9 +20,11 @@ hold off
 axes(handles.acceptorTraceAxes)
 title('Acceptor Ch')
 hold off
+
 axes(handles.fretCalcAxes)
 title('Calc')
 hold off
 
 %set focus back to GUI
 figure(handles.figure1)
+h = handles;

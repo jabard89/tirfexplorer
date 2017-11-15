@@ -257,7 +257,7 @@ switch whichChannel
         
         for i=1:nleftPeaks
             highlightPeak(handles,'left',leftPeaks(1,:),'go');
-            p_tform=tforminv(handles.tform,leftPeaks(1,1:2));
+            p_tform=transformPointsInverse(handles.tform,leftPeaks(1,1:2));
             highlightPeak(handles,'right',p_tform,'bo');
         end
         %run trace(s)
@@ -278,7 +278,7 @@ switch whichChannel
         
         for i=1:nrightPeaks
             highlightPeak(handles,'right',rightPeaks(1,:),'go');
-            p_tform=tforminv(handles.tform,rightPeaks(1,1:2));
+            p_tform=transformPointsForward(handles.tform,rightPeaks(1,1:2));
             highlightPeak(handles,'left',p_tform,'bo');
         end
         %run trace(s)
@@ -345,6 +345,6 @@ end
 if handles.driftToggle
     highlightPeak(handles,handles.refChannel,handles.refPeak,'g+');
 end
-setAxesProperties(handles)
+setAxesProperties(handles);
 end
 >>>>>>> dev
