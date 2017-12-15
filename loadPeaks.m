@@ -5,6 +5,7 @@
 function h = loadPeaks(handles)
 %Load variables from handles
 nImagesProcess=handles.nImagesProcess;
+nImagesAvg=handles.nImagesAvg;
 donorFile=handles.donorFile;
 left_dim=handles.left_dim;
 right_dim=handles.right_dim;
@@ -28,7 +29,7 @@ else
 end
 %On the first loop, ask for threshhold, but use the same threshold for the
 %remaining loops
-nRemainder=mod(nImagesProcess,5);
+nRemainder=mod(nImagesProcess,nImagesAvg);
 if handles.driftToggle
     if handles.refPeak
         refPeak=handles.refPeak;
@@ -39,22 +40,23 @@ if handles.driftToggle
     end
 end
 %make five frame averages
-for cIm=1:5:nImagesProcess-nRemainder
+nA=nImagesAvg;
+for cIm=1:nA:nImagesProcess-nRemainder
     cIm %report the image # being processed
     
     %Copy peaks from previous frames
     if cIm>1
-        leftFilt(:,:,cIm:cIm+4)=repmat(leftFilt(:,:,cIm-1),1,1,5);
-        rightFilt(:,:,cIm:cIm+4)=repmat(rightFilt(:,:,cIm-1),1,1,5);
+        leftFilt(:,:,cIm:cIm+nA-1)=repmat(leftFilt(:,:,cIm-1),1,1,nA);
+        rightFilt(:,:,cIm:cIm+nA-1)=repmat(rightFilt(:,:,cIm-1),1,1,nA);
     end
     nLeftFilt=sum(leftFilt(:,1,cIm)~=0);
     nRightFilt=sum(rightFilt(:,1,cIm)~=0);
     %load a moving average of the image
-    temp=loadAverage(donorFile,cIm,cIm+4);
+    temp=loadAverage(donorFile,cIm,cIm+nA-1);
     temp.l=temp.avg(left_dim(3):left_dim(4),left_dim(1):left_dim(2));
     temp.r=temp.avg(right_dim(3):right_dim(4),right_dim(1):right_dim(2));
     if handles.alexToggle
-        tempAcceptor=loadAverage(acceptorFile,cIm,cIm+4);
+        tempAcceptor=loadAverage(acceptorFile,cIm,cIm+nA-1);
         temp.r=tempAcceptor.avg(right_dim(3):right_dim(4),...
             right_dim(1):right_dim(2));
     end
@@ -75,10 +77,10 @@ for cIm=1:5:nImagesProcess-nRemainder
             errordlg('Shift is too large')
             return
         end
-        leftFilt(1:nLeftFilt,1:2,cIm:cIm+4)=...
-            leftFilt(1:nLeftFilt,1:2,cIm:cIm+4)+repmat(shift,nLeftFilt,1,5);
-        rightFilt(1:nRightFilt,1:2,cIm:cIm+4)=...
-            rightFilt(1:nRightFilt,1:2,cIm:cIm+4)+repmat(shift,nRightFilt,1,5);
+        leftFilt(1:nLeftFilt,1:2,cIm:cIm+nA-1)=...
+            leftFilt(1:nLeftFilt,1:2,cIm:cIm+nA-1)+repmat(shift,nLeftFilt,1,nA);
+        rightFilt(1:nRightFilt,1:2,cIm:cIm+nA-1)=...
+            rightFilt(1:nRightFilt,1:2,cIm:cIm+nA-1)+repmat(shift,nRightFilt,1,nA);
         refPeak=refPeak(1,1:2)+shift; %update the position of the ref
         totalShift=totalShift+shift
     end
@@ -105,29 +107,29 @@ for cIm=1:5:nImagesProcess-nRemainder
     for j=1:size(temp.lfilt,1)
         %Check if peak is near another peak
         nearPeaks=findNearPoints(temp.lfilt(j,1:2),...
-            squeeze(leftFilt(:,:,cIm)),5);
+            squeeze(leftFilt(:,:,cIm)),nA);
         if isempty(nearPeaks)
             newPeakCounter=newPeakCounter+1;
             if nLeftFilt+newPeakCounter>handles.maxPeaks
                 errordlg('Too many left peaks found')
                 return
             end
-            leftFilt(nLeftFilt+newPeakCounter,:,cIm:cIm+4)=...
-                repmat(temp.lfilt(j,:),1,1,5);
+            leftFilt(nLeftFilt+newPeakCounter,:,cIm:cIm+nA-1)=...
+                repmat(temp.lfilt(j,:),1,1,nA);
         end
     end
     newPeakCounter=0;
     for j=1:size(temp.rfilt,1)
         nearPeaks=findNearPoints(temp.rfilt(j,1:2),...
-            squeeze(rightFilt(:,:,cIm)),5);
+            squeeze(rightFilt(:,:,cIm)),nA);
         if isempty(nearPeaks)
             newPeakCounter=newPeakCounter+1;
             if nRightFilt+newPeakCounter>handles.maxPeaks
                 errordlg('Too many right peaks found')
                 return
             end
-            rightFilt(nRightFilt+newPeakCounter,:,cIm:cIm+4)=...
-                repmat(temp.rfilt(j,:),1,1,5);
+            rightFilt(nRightFilt+newPeakCounter,:,cIm:cIm+nA-1)=...
+                repmat(temp.rfilt(j,:),1,1,nA);
         end
     end
     %report progress
@@ -135,9 +137,9 @@ for cIm=1:5:nImagesProcess-nRemainder
     nRightFilt=sum(rightFilt(:,1,cIm)~=0)
 end
 %Fill out peaks with last few frames if not divisible by 5
-nRemainder=mod(nImagesProcess,5);
+nRemainder=mod(nImagesProcess,nA);
 if nRemainder>0
-    cIm=cIm+5;
+    cIm=cIm+nA;
     leftFilt(:,:,cIm:cIm+nRemainder-1)=...
         repmat(leftFilt(:,:,cIm-1),1,1,nRemainder);
     rightFilt(:,:,cIm:cIm+nRemainder-1)=...
