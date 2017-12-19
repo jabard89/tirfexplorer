@@ -3,154 +3,86 @@
 %Jared Bard
 %March 2, 2017
 function [handles] = plotPoint2(handles,whichChannel,peaks1,peaks2)
-exp=handles.exp;
-if handles.alexToggle
-    expAcceptor=handles.expAcceptor;
-end
-%Start by redrawing both channels
-%Redraw left channel
-axes(handles.donorImageAxes);
-hold off
-imshow(exp.avgl,[])
-hold on
-plot(exp.lfilt(:,1),exp.lfilt(:,2),'yo')
-plot(exp.linked_lpeaks(:,1),exp.linked_lpeaks(:,2),'ro')
-hold off
-%Redraw Right Channel
-if handles.alexToggle
-    axes(handles.fretImageAxes);
-    hold off;
-    imshow(exp.avgr,[])
-    hold on
-    plot(exp.rfilt(:,1),exp.rfilt(:,2),'yo')
-    plot(exp.linked_rpeaks(:,1),exp.linked_rpeaks(:,2),'ro')
-    hold off
-    axes(handles.acceptorImageAxes);
-    hold off;
-    imshow(expAcceptor.avgr,[])
-    hold on
-    plot(exp.rfilt(:,1),exp.rfilt(:,2),'yo')
-    plot(exp.linked_rpeaks(:,1),exp.linked_rpeaks(:,2),'ro')
-    hold off
-else
-    axes(handles.fretImageAxes);
-    hold off
-    imshow(exp.avgr,[])
-    hold on
-    plot(exp.rfilt(:,1),exp.rfilt(:,2),'yo')
-    plot(exp.linked_rpeaks(:,1),exp.linked_rpeaks(:,2),'ro')
-    hold off
-end
-    function h=plotTrace(ax,trace)
+    function h=plotTrace(ax,plotObject,trace)
         trace=squeeze(trace);
         len=length(trace);
-        axes(ax);
-        hold off;
-        % plot(1:len,smooth(trace1(2,:)))
-        % hold on
-        % plot(1:len,smooth(trace1(3,:)))
-        % legend({'Peak','Background'})
-        % hold off
         peak_int=trace(2,:)-trace(3,:);
-        plot(1:len,peak_int)
-        ylim([0 max(peak_int)])
+        set(plotObject,'XData',1:len,'YData',peak_int);
+        set(ax,'Ylim',[0 max(peak_int)]);
     end
 
-%Now highlight appropriate peaks and calculate their traces
-switch whichChannel
-    case 'left'
-        leftPeaks=peaks1;
-        nleftPeaks=size(peaks1,1);
-        
-        for i=1:nleftPeaks
-            highlightPeak(handles,'left',leftPeaks(1,:),'go');
-            p_tform=transformPointsInverse(handles.tform,leftPeaks(1,1:2));
-            highlightPeak(handles,'right',p_tform,'bo');
+    function h=plotLeft(handles,leftPeaks)
+        plots=handles.plots;
+        nLeftPeaks=size(leftPeaks,1);
+        for i=1:nLeftPeaks
+            set(plots.gDonorImage,'XData',leftPeaks(i,1),...
+                'YData',leftPeaks(i,2));
+            pTform=transformPointsForward(handles.tform,leftPeaks(i,1:2));
+            set(plots.bFretImage,'XData',pTform(:,1),'YData',pTform(:,2));
+            if handles.alexToggle
+                set(plots.bAcceptorImage,'XData',pTform(:,1),...
+                    'YData',pTform(:,2));
         end
         %run trace(s)
         leftTraces=tracemovie(handles.donorFile,handles.rinnercircle,...
             handles.routercircle,1,leftPeaks,handles.left_dim);
         handles.ltrace=leftTraces;
         %plot the first trace
-        plotTrace(handles.donorTraceAxes,leftTraces{1});
-        %finally plot any right points currently selected
-        if isfield(handles,'peakr_i')
-            p=exp.rfilt(handles.peakr_i,:);
-            highlightPeak(handles,'right',p,'go')
+        plotTrace(handles.donorTraceAxes,plots.donorTrace,leftTraces{1});
+        end
+        h=handles;
+    end
+
+    function h=plotRight(handles,rightPeaks)
+        plots=handles.plots;
+        nRightPeaks=size(rightPeaks,1);
+        
+        for i=1:nRightPeaks
+            set(plots.gFretImage,'XData',rightPeaks(i,1),...
+                'YData',rightPeaks(i,2));
+            if handles.alexToggle
+                set(plots.gAcceptorImage,'XData',rightPeaks(i,1),...
+                    'YData',rightPeaks(i,2));
+            end
+            
+            pTform=transformPointsInverse(handles.tform,rightPeaks(i,1:2));
+            set(plots.bDonorImage,'XData',pTform(:,1),'YData',pTform(:,2));
         end
         
+        %run trace(s)
+        try
+        if handles.alexToggle
+            rightAcceptorTraces=tracemovie(handles.acceptorFile,...
+                handles.rinnercircle,handles.routercircle,1,rightPeaks,...
+                handles.right_dim);
+            handles.rAcceptortraces=rightAcceptorTraces;
+            plotTrace(handles.acceptorTraceAxes,plots.acceptorTrace,....
+                rightAcceptorTraces{1});
+        end
+        rightTraces=tracemovie(handles.donorFile,...
+            handles.rinnercircle,handles.routercircle,1,rightPeaks,...
+            handles.right_dim);
+        handles.rtrace=rightTraces;
+        %plot the first trace
+        plotTrace(handles.fretTraceAxes,plots.fretTrace,rightTraces{1});
+        h=handles;
+        catch ME
+            errrordlg('Please Reload the Movie or turn off ALEX')
+            rethrow(ME)
+        end
+    end
+
+switch whichChannel
+    case 'left'
+        handles=plotLeft(handles,peaks1);
     case 'right'
-        rightPeaks=peaks1;
-        nrightPeaks=size(peaks1,1);
-        
-        for i=1:nrightPeaks
-            highlightPeak(handles,'right',rightPeaks(1,:),'go');
-            p_tform=transformPointsForward(handles.tform,rightPeaks(1,1:2));
-            highlightPeak(handles,'left',p_tform,'bo');
-        end
-        %run trace(s)
-        if handles.alexToggle
-            rightAcceptorTraces=tracemovie(handles.acceptorFile,...
-                handles.rinnercircle,handles.routercircle,1,rightPeaks,...
-                handles.right_dim);
-            handles.rAcceptortraces=rightAcceptorTraces;
-            plotTrace(handles.acceptorTraceAxes,rightAcceptorTraces{1});
-        end
-        rightTraces=tracemovie(handles.donorFile,...
-            handles.rinnercircle,handles.routercircle,1,rightPeaks,...
-            handles.right_dim);
-        handles.rtrace=rightTraces;
-        %plot the first trace
-        plotTrace(handles.fretTraceAxes,rightTraces{1});
-        
-        %finally plot any left points currently selected
-        if isfield(handles,'peakl_i')
-            p=exp.lfilt(handles.peakl_i,:);
-            highlightPeak(handles,'left',p,'go')
-        end
-        
+        handles=plotRight(handles,peaks1);
     case 'both'
-        leftPeaks=peaks1;
-        nleftPeaks=size(leftPeaks,1);
-        rightPeaks=peaks2;
-        nrightPeaks=size(rightPeaks,1);
-        
-        for i=1:nleftPeaks
-            highlightPeak(handles,'left',leftPeaks(1,:),'go');
-        end
-        %run trace(s)
-        leftTraces=tracemovie(handles.donorFile,...
-            handles.rinnercircle,handles.routercircle,1,leftPeaks,...
-            handles.left_dim);
-        handles.ltrace=leftTraces;
-        %plot the first trace
-        plotTrace(handles.donorTraceAxes,leftTraces{1});
-        
-        for i=1:nrightPeaks
-            highlightPeak(handles,'right',rightPeaks(1,:),'go');
-        end
-        %run trace(s)
-        if handles.alexToggle
-            rightAcceptorTraces=tracemovie(handles.acceptorFile,...
-                handles.rinnercircle,handles.routercircle,1,rightPeaks,...
-                handles.right_dim);
-            handles.rAcceptortraces=rightAcceptorTraces;
-            plotTrace(handles.acceptorTraceAxes,rightAcceptorTraces{1});
-        end
-        rightTraces=tracemovie(handles.donorFile,...
-            handles.rinnercircle,handles.routercircle,1,rightPeaks,...
-            handles.right_dim);
-        handles.rtrace=rightTraces;
-        %plot the first trace
-        plotTrace(handles.fretTraceAxes,rightTraces{1});
-        
+        handles=plotLeft(handles,peaks1);
+        handles=plotRight(handles,peaks2);
         %plot FRET
-        lTrace=squeeze(leftTraces{1});
-        rTrace=squeeze(rightTraces{1});
-        plotFret(handles.fretCalcAxes,lTrace,rTrace,0);
+        lTrace=squeeze(handles.ltrace{1});
+        rTrace=squeeze(handles.rtrace{1});
+        plotFret(handles,lTrace,rTrace,0);
 end
-if handles.driftToggle
-    highlightPeak(handles,handles.refChannel,handles.refPeak,'g+');
-end
-setAxesProperties(handles);
 end

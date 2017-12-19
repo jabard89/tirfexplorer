@@ -63,10 +63,11 @@ handles.nImagesAvg=5; %how many averages to average for images
 handles.nImagesProcess=0; %frames to analyze (0=all)
 handles.alexToggle=0; %use a seperate channel for acceptor
 handles.driftToggle=0; %track a peak to calculate drift
-handles.maxPeaks=500; %maximum number of peaks to analyze
+handles.maxPeaks=1000; %maximum number of peaks to analyze
 handles.leftThresholdToggle=0; %0 uses a gui for thresholding.
 handles.rightThresholdToggle=0; %0 uses a gui for thresholding.
 handles.peaksFromFileToggle=0; %0 loads peaks from the movie
+
 
 % Update handles structure
 guidata(hObject, handles);
@@ -97,19 +98,15 @@ function loadImageButton_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 
-%Load figure window
-handles=loadFigureWindows(handles);
-guidata(hObject,handles);
-
 %Load the image for visualization and clear all of the plots
 %Reload variables from the handles
-nImagesProcess=handles.nImagesProcess;
 donorFile=handles.donorFile;
 left_dim=handles.left_dim;
 right_dim=handles.right_dim;
 
 handles=initializeImages(handles);
 exp=handles.exp;
+nImagesProcess=handles.nImagesProcess;
 
 if ~handles.peaksFromFileToggle
     %Load the peaks from the image
@@ -123,6 +120,7 @@ else
         rightPeaks=handles.rightPeaks;
     catch
         errordlg('Please load a valid left and right peak file')
+        return
     end
     %Need to repmat peaks across entire movie
     exp.lfilt=repmat(leftPeaks,[1 1 nImagesProcess]);
@@ -149,34 +147,27 @@ handles.fretMovie=makeMovie(donorFile,nImagesProcess,right_dim);
 if handles.alexToggle
     handles.acceptorMovie=makeMovie(acceptorFile,nImagesProcess,right_dim);
 end
-
-%Plot peaks on images
-axes(handles.donorImageAxes);
-imshow(exp.avgl,[])
-hold on
-plot(exp.lfilt(:,1),exp.lfilt(:,2),'yo')
-plot(exp.linked_lpeaks(:,1),exp.linked_lpeaks(:,2),'ro')
-hold off
-axes(handles.fretImageAxes);
-imshow(exp.avgr,[])
-hold on
-plot(exp.rfilt(:,1),exp.rfilt(:,2),'yo')
-plot(exp.linked_rpeaks(:,1),exp.linked_rpeaks(:,2),'ro')
-hold off
-if handles.alexToggle
-    axes(handles.acceptorImageAxes);
-    imshow(handles.expAcceptor.avgr,[])
-    hold on
-    plot(exp.rfilt(:,1),exp.rfilt(:,2),'yo')
-    plot(exp.linked_rpeaks(:,1),exp.linked_rpeaks(:,2),'ro')
-    hold off
-end
-if handles.driftToggle
-    highlightPeak(handles,handles.refChannel,handles.refPeak,'g+');
-end
-setAxesProperties(handles);
-
 handles.exp=exp;
+
+%Load figures and plot peaks
+handles=loadFigureWindows(handles);
+
+if handles.driftToggle
+    switch handles.refChannel
+    case 'left'
+        set(plots.donorRef,'XData',handles.refPeak(1,1),...
+            'YData',handles.refPeak(1,2));
+    case 'right'
+        if handles.alexToggle
+            set(plots.acceptorRef,'XData',handles.refPeak(1,1),...
+                'YData',handles.refPeak(1,2));
+        else
+            set(plots.fretRef,'XData',handles.refPeak(1,1),...
+                'YData',handles.refPeak(1,2));
+        end
+    end
+end
+
 guidata(hObject,handles);
 finished='yes'
 
@@ -227,27 +218,12 @@ function openDonorChannelButton_Callback(hObject, eventdata, handles)
 filename='';
 pathname='';
 [filename, pathname]=uigetfile('*.tif','Open Tirf','E:\Martin\Data\TIRF!');
+if ~filename
+    return
+end
 handles.donorFile=[pathname filename];
-guidata(hObject,handles);
 set(handles.text1,'String',filename);
-
-% --- Executes on button press in pushbutton3.
-function pushbutton3_Callback(hObject, eventdata, handles)
-% hObject    handle to pushbutton3 (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-map_name='';
-map_path='';
-[map_name, map_path]=uigetfile('*','Open Map','E:\Martin\Data\TIRF!');
-handles.map_file=[map_path map_name];
-set(handles.text4,'String',map_name);
-map=load(handles.map_file);
-map_var=fieldnames(map);
-map=map.(map_var{1});
-tform=fitgeotrans(map(:,1:2),map(:,3:4),'nonreflectivesimilarity');
-handles.tform=tform;
 guidata(hObject,handles);
-
 
 % --- Executes on button press in pickLeftButton.
 function pickLeftButton_Callback(hObject, eventdata, handles)
@@ -289,7 +265,7 @@ if ~handles.alexToggle
 end
 lTrace=squeeze(handles.ltrace{1});
 rTrace=squeeze(handles.rAcceptortraces{1});
-plotFret(handles.fretCalcAxes,lTrace,rTrace,0);
+plotFret(handles,lTrace,rTrace,0);
 
 
 % --- Executes on selection change in listbox2.
@@ -397,13 +373,22 @@ function change_radii_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 rinnercircle_msg=sprintf('%s%d%s\n%s','Current rinnercircle (peak size) is '...
     ,handles.rinnercircle,'.','Change to:');
-rinnercircle=inputdlg(rinnercircle_msg);
+answer=inputdlg(rinnercircle_msg);
+if isempty(answer) || isempty(answer{1})
+    ;
+else
+    handles.rinnercircle=str2num(answer{1});
+end
+
 routercircle_msg=sprintf('%s%d%s\n%s',...
     'Current routercircle (bkgd doughnut size) is '...
     ,handles.routercircle,'.','Change to:');
-routercircle=inputdlg(routercircle_msg);
-handles.rinnercircle=str2num(rinnercircle{1});
-handles.routercircle=str2num(routercircle{1});
+answer=inputdlg(routercircle_msg);
+if isempty(answer) || isempty(answer{1})
+    ;
+else
+    handles.routercircle=str2num(answer{1});
+end
 guidata(hObject,handles);
 
 
@@ -421,7 +406,10 @@ function load_map_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 map_name='';
 map_path='';
-[map_name, map_path]=uigetfile('*','Open Map','E:\Martin\Data\TIRF!');
+[map_name, map_path]=uigetfile('.mat','Open Map','E:\Martin\Data\TIRF!');
+if ~map_name
+    return
+end
 handles.map_file=[map_path map_name];
 map=load(handles.map_file);
 map_var=fieldnames(map);
@@ -439,6 +427,9 @@ function change_left_dim_Callback(hObject, eventdata, handles)
 left_dim_msg=sprintf('%s%s%s\n%s','Current Left Dimensions (X_min X_max Y_min Y_max): ['...
     ,num2str(handles.left_dim),']','Change to:');
 left_string=inputdlg(left_dim_msg);
+if isempty(left_string) || isempty(left_string{1})
+    return
+end
 handles.left_dim=str2num(left_string{1});
 guidata(hObject,handles);
 % --------------------------------------------------------------------
@@ -449,6 +440,9 @@ function change_right_dim_Callback(hObject, eventdata, handles)
 right_dim_msg=sprintf('%s%s%s\n%s','Current Right Dimensions (X_min X_max Y_min Y_max): ['...
     ,num2str(handles.right_dim),']','Change to:');
 right_string=inputdlg(right_dim_msg);
+if isempty(right_string) || isempty(right_string{1})
+    return
+end
 handles.right_dim=str2num(right_string{1});
 guidata(hObject,handles);
 % --------------------------------------------------------------------
@@ -459,6 +453,9 @@ function nImagesAvgButton_Callback(hObject, eventdata, handles)
 n_images_msg=sprintf('%s%s%s\n%s','Current # of images to average is: '...
     ,num2str(handles.nImagesAvg),'.','Change to:');
 n_images_string=inputdlg(n_images_msg);
+if isempty(n_images_string) || isempty(n_images_string{1})
+    return
+end
 handles.nImagesAvg=str2num(n_images_string{1});
 guidata(hObject,handles);
 
@@ -506,6 +503,9 @@ function openAcceptorChannelButton_Callback(hObject, eventdata, handles)
 filename='';
 pathname='';
 [filename, pathname]=uigetfile('*.tif','Open Tirf','E:\Martin\Data\TIRF!');
+if ~filename
+    return
+end
 handles.acceptorFile=[pathname filename];
 set(handles.text8,'String',filename);
 guidata(hObject,handles);
@@ -518,6 +518,9 @@ function alex_toggle_Callback(hObject, eventdata, handles)
 alexToggleMsg=sprintf('%s%s%s\n%s',['Toggle ALEX On (1) or Off (0).'...
     'Current state is: '],num2str(handles.alexToggle),'.','Change to:');
 alexToggleString=inputdlg(alexToggleMsg);
+if isempty(alexToggleString) || isempty(alexToggleString{1})
+    return;
+end
 handles.alexToggle=str2num(alexToggleString{1});
 guidata(hObject,handles);
 
@@ -530,6 +533,9 @@ function driftToggleButton_Callback(hObject, eventdata, handles)
 driftToggleMsg=sprintf('%s%s%s\n%s',['Toggle Drift Correction On (1) or Off (0).'...
     'Current state is: '],num2str(handles.driftToggle),'.','Change to:');
 driftToggleString=inputdlg(driftToggleMsg);
+if isempty(driftToggleString) || isempty(driftToggleString{1})
+    return
+end
 handles.driftToggle=str2num(driftToggleString{1});
 guidata(hObject,handles);
 
@@ -543,6 +549,9 @@ n_images_msg=sprintf('%s%s%s\n%s',['Current # of images to process is'...
     ' (0 defaults to entire movie): '],num2str(handles.nImagesProcess),...
     '.','Change to:');
 n_images_string=inputdlg(n_images_msg);
+if isempty(n_images_string) || isempty(n_images_string{1})
+    return;
+end
 handles.nImagesProcess=str2num(n_images_string{1});
 guidata(hObject,handles);
 
@@ -556,6 +565,9 @@ refPeak_msg=sprintf('%s\n%s',...
     'Current Reference Peak is highlight in red.',...
     'Which channel would you like to select from? (left or right)');
 refChannel=inputdlg(refPeak_msg);
+if isempty(refChannel) || isempty(refChannel{1})
+    return
+end
 refChannel=refChannel{1};
 handles.refChannel=refChannel;
 switch refChannel
@@ -563,21 +575,30 @@ switch refChannel
         ax=handles.donorImageAxes;
         channelDim=handles.left_dim;
         peakList=handles.exp.lfilt(:,:,1);
+        [refPeak i]=pickPoint(ax,channelDim,peakList);
+        handles.refPeak=refPeak;
+        set(handles.plots.donorRef,'XData',refPeak(1,1),...
+            'YData',refPeak(1,2));
     case 'right'
         channelDim=handles.right_dim;
         peakList=handles.exp.rfilt(:,:,1);
         if handles.alexToggle
             ax=handles.acceptorImageAxes;
+            [refPeak i]=pickPoint(ax,channelDim,peakList);
+            handles.refPeak=refPeak;
+            set(handles.plots.acceptorRef,'XData',refPeak(1,1),...
+                'YData',refPeak(1,2));
         else
             ax=handles.fretImageAxes;
+            [refPeak i]=pickPoint(ax,channelDim,peakList);
+            handles.refPeak=refPeak;
+            set(handles.plots.fretRef,'XData',refPeak(1,1),...
+                'YData',refPeak(1,2));
         end
     otherwise
         errordlg('Please pick either left or right')
         return
 end
-[refPeak i]=pickPoint(ax,channelDim,peakList);
-handles.refPeak=refPeak;
-highlightPeak(handles,refChannel,refPeak,'g+');
 guidata(hObject,handles);
 
 
@@ -588,14 +609,7 @@ function plotDonorFretButton_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 lTrace=squeeze(handles.ltrace{1});
 rTrace=squeeze(handles.rtrace{1});
-plotFret(handles.fretCalcAxes,lTrace,rTrace,0);
-
-% --- Executes on button press in calcFretButton.
-function calcFretButton_Callback(hObject, eventdata, handles)
-% hObject    handle to calcFretButton (see GCBO)
-% eventdata  reserved - to be defined in a future version of MATLAB
-% handles    structure with handles and user data (see GUIDATA)
-
+plotFret(handles,lTrace,rTrace,0);
 
 % --------------------------------------------------------------------
 function setLeftThresholdButton_Callback(hObject, eventdata, handles)
@@ -606,6 +620,10 @@ leftThresholdToggleMsg=sprintf('%s%s%s\n%s',['Set left threshold by entering a v
     'A value of 0 uses a gui to set threshold. '...
     'Current left threshold is: '],num2str(handles.leftThresholdToggle),'.','Change to:');
 leftThresholdToggleString=inputdlg(leftThresholdToggleMsg);
+if isempty(leftThresholdToggleString) || ...
+        isempty(leftThresholdToggleString{1})
+    return
+end
 handles.leftThresholdToggle=str2num(leftThresholdToggleString{1});
 guidata(hObject,handles);
 
@@ -619,6 +637,10 @@ rightThresholdToggleMsg=sprintf('%s%s%s\n%s',['Set right threshold by entering a
     'A value of 0 uses a gui to set threshold. '...
     'Current right threshold is: '],num2str(handles.rightThresholdToggle),'.','Change to:');
 rightThresholdToggleString=inputdlg(rightThresholdToggleMsg);
+if isempty(rightThresholdToggleString) ||...
+        isempty(rightThresholdToggleString{1})
+    return
+end
 handles.rightThresholdToggle=str2num(rightThresholdToggleString{1});
 guidata(hObject,handles);
 
@@ -863,7 +885,7 @@ function exportCPButton_Callback(hObject, eventdata, handles)
 exportPeaks(handles.exp,1,0)
 
 % --------------------------------------------------------------------
-function exportLinkedPeaksButton_Callback(hObject, eventdata, handles)
+function exportLinkedPeaksButton_Callback(hObject, eventdata,    handles)
 % hObject    handle to exportLinkedPeaksButton (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
@@ -890,6 +912,9 @@ leftPeaks=[];
 rightPeaks=[];
 try
     [leftPeakFile, leftPeakPath] = uigetfile('*.csv','Open Left Peaks');
+    if ~leftPeakFile
+        return
+    end
     leftFileName=[leftPeakPath leftPeakFile];
     leftPeaks=csvread(leftFileName);
     %include 0s for other parameters generated by peak finding algorithm
@@ -897,6 +922,11 @@ try
     handles.leftPeaks=zeros(nLeftPeaks,4);
     handles.leftPeaks(:,1:2)=leftPeaks;
     [rightPeakFile, rightPeakPath] = uigetfile('*.csv','Open Right Peaks');
+    
+    if ~rightPeakFile
+        return
+    end
+    
     rightFileName=[rightPeakPath rightPeakFile];
     rightPeaks=csvread(rightFileName);
     %include 0s for other parameters generated by peak finding algorithm
@@ -904,7 +934,7 @@ try
     handles.rightPeaks=zeros(nRightPeaks,4);
     handles.rightPeaks(:,1:2)=rightPeaks;
 catch
-    errordlg('Please load a valid left and right peak file')
+    errordlg('Please load a valid left and right peak file [x y]')
     return
 end
 guidata(hObject,handles);
@@ -918,9 +948,14 @@ function usePeaksFileButton_Callback(hObject, eventdata, handles)
 peaksFromFileMsg=sprintf('%s%s%s\n%s',['Toggle using peaks from a loaded file '...
     'On (1) or Off (0).'...
     'Current state is: '],num2str(handles.peaksFromFileToggle),'.','Change to:');
-peaksFromFileString=inputdlg(peaksFromFileMsg);
-handles.peaksFromFileToggle=str2num(peaksFromFileString{1});
-guidata(hObject,handles);
+answer=inputdlg(peaksFromFileMsg);
+if isempty(answer) || isempty(answer{1})
+    return
+else
+    peaksFromFileString=answer;
+    handles.peaksFromFileToggle=str2num(peaksFromFileString{1});
+    guidata(hObject,handles);
+end
 
 
 % --------------------------------------------------------------------

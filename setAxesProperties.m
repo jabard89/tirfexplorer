@@ -7,9 +7,11 @@ hold off
 axes(handles.fretImageAxes)
 title('FRET')
 hold off
-axes(handles.acceptorImageAxes);
-title('Acceptor');
-hold off
+if handles.alexToggle
+    axes(handles.acceptorImageAxes);
+    title('Acceptor');
+    hold off
+end
     
 axes(handles.donorTraceAxes)
 title('Donor Ch')
@@ -17,9 +19,11 @@ hold off
 axes(handles.fretTraceAxes)
 title('FRET Ch')
 hold off
-axes(handles.acceptorTraceAxes)
-title('Acceptor Ch')
-hold off
+if handles.alexToggle
+    axes(handles.acceptorTraceAxes)
+    title('Acceptor Ch')
+    hold off
+end
 
 axes(handles.fretCalcAxes)
 title('Calc')

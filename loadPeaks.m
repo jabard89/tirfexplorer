@@ -14,7 +14,7 @@ if handles.alexToggle
     acceptorFile=handles.acceptorFile;
 end
 %load arrays to store peak positions for every frame
-handles.maxPeaks=500;
+handles.maxPeaks=1000;
 leftFilt=zeros(handles.maxPeaks,4,nImagesProcess);
 rightFilt=zeros(handles.maxPeaks,4,nImagesProcess);
 if handles.leftThresholdToggle
@@ -93,7 +93,7 @@ for cIm=1:nA:nImagesProcess-nRemainder
         [temp.lp leftThreshold]=findPeaks(temp.l);
         leftThreshold
     end
-    if rightThreshold
+   if rightThreshold
         [temp.rp]=findPeaks(temp.r,rightThreshold);
     else
         [temp.rp rightThreshold]=findPeaks(temp.r);
