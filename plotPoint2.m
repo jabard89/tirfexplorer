@@ -23,12 +23,18 @@ function [handles] = plotPoint2(handles,whichChannel,peaks1,peaks2)
                 set(plots.bAcceptorImage,'XData',pTform(:,1),...
                     'YData',pTform(:,2));
         end
-        %run trace(s)
-        leftTraces=tracemovie(handles.donorFile,handles.rinnercircle,...
-            handles.routercircle,1,leftPeaks,handles.left_dim);
-        handles.ltrace=leftTraces;
+        %run trace(s) unless already calculated
+        if ~handles.allTracesCalculated
+            leftTraces=tracemovie(handles.donorFile,handles.rinnercircle,...
+                handles.routercircle,handles.nImagesAvg,...
+                1,leftPeaks,handles.left_dim);
+            handles.donorTrace=leftTraces{1};
+        else
+            handles.donorTrace=handles.allDonorTraces(handles.peakl_i,:,:);
+        end
         %plot the first trace
-        plotTrace(handles.donorTraceAxes,plots.donorTrace,leftTraces{1});
+        plotTrace(handles.donorTraceAxes,plots.donorTrace,...
+            handles.donorTrace);
         end
         h=handles;
     end
@@ -52,22 +58,35 @@ function [handles] = plotPoint2(handles,whichChannel,peaks1,peaks2)
         %run trace(s)
         try
         if handles.alexToggle
-            rightAcceptorTraces=tracemovie(handles.acceptorFile,...
-                handles.rinnercircle,handles.routercircle,1,rightPeaks,...
-                handles.right_dim);
-            handles.rAcceptortraces=rightAcceptorTraces;
+            if ~handles.allTracesCalculated
+                acceptorTraces=tracemovie(handles.acceptorFile,...
+                    handles.rinnercircle,handles.routercircle,...
+                    handles.nImagesAvg,1,rightPeaks,...
+                    handles.right_dim);
+                handles.acceptorTrace=acceptorTraces{1};
+            else
+               handles.acceptorTrace=handles.allAcceptorTraces...
+                   (handles.peakr_i,:,:);
+            end
             plotTrace(handles.acceptorTraceAxes,plots.acceptorTrace,....
-                rightAcceptorTraces{1});
+                handles.acceptorTrace);
         end
-        rightTraces=tracemovie(handles.donorFile,...
-            handles.rinnercircle,handles.routercircle,1,rightPeaks,...
-            handles.right_dim);
-        handles.rtrace=rightTraces;
-        %plot the first trace
-        plotTrace(handles.fretTraceAxes,plots.fretTrace,rightTraces{1});
+        
+        if ~handles.allTracesCalculated
+            fretTraces=tracemovie(handles.donorFile,...
+                handles.rinnercircle,handles.routercircle,...
+                handles.nImagesAvg,1,rightPeaks,...
+                handles.right_dim);
+            handles.fretTrace=fretTraces{1};
+        else
+            handles.fretTrace=handles.allFretTraces...
+                (handles.peakr_i,:,:);
+        end
+        plotTrace(handles.fretTraceAxes,plots.fretTrace,...
+            handles.fretTrace);
         h=handles;
         catch ME
-            errrordlg('Please Reload the Movie or turn off ALEX')
+            errordlg('Please Reload the Movie or turn off ALEX')
             rethrow(ME)
         end
     end
@@ -81,8 +100,8 @@ switch whichChannel
         handles=plotLeft(handles,peaks1);
         handles=plotRight(handles,peaks2);
         %plot FRET
-        lTrace=squeeze(handles.ltrace{1});
-        rTrace=squeeze(handles.rtrace{1});
+        lTrace=squeeze(handles.donorTrace);
+        rTrace=squeeze(handles.fretTrace);
         plotFret(handles,lTrace,rTrace,0);
 end
 end

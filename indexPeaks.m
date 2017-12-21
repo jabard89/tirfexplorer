@@ -1,4 +1,5 @@
-function [pindex]=indexPeaks(image_size,peaks,rinnercircle,routercircle)
+function [pindex]=indexPeaks(image_size,peaks,rinnercircle,routercircle,...
+    nImagesProcess,nImagesAvg)
 %%Creates index of pixels to score
 %Jared Bard August 19, 2014
 %MakeCircle is based on the twoTone image suite
@@ -11,13 +12,29 @@ function [pindex]=indexPeaks(image_size,peaks,rinnercircle,routercircle)
 %Given an image with an array of peaks (x1 y1;x2 y2;etc), outputs a list of
 %pixels to score for intensity by pscore
 %%Load Parameters
-npeaks=size(peaks,1);
+nPeaks=size(peaks,1);
 nFrames=size(peaks,3);
-pindex=cell(npeaks,2,nFrames);
-for i=1:npeaks
-    for j=1:nFrames
-        [pindex{i,1,j} pindex{i,2,j}]=MakeCircle(image_size,peaks(i,1:2,j),...
+pindex=cell(nPeaks,2,nFrames);
+
+nA=nImagesAvg;
+nRemainder=mod(nImagesProcess-1,nImagesAvg);
+disp('Making peak indices for:')
+for cIm=1:nA:nImagesProcess-nRemainder
+    disp(cIm)
+    %First fill in previous frames
+    if cIm>1
+        pindex(:,:,cIm-nA+1:cIm-1)=repmat(pindex(:,:,cIm-nA),1,1,nA-1);
+    end
+    %Then recalculate peak index for each peak
+    for i=1:nPeaks
+        [pindex{i,1,cIm} pindex{i,2,cIm}]=...
+            MakeCircle(image_size,peaks(i,1:2,cIm),...
             rinnercircle,routercircle);
     end
 end
+%Fill out indices with last few frames
+if nRemainder>0
+    cIm=cIm+nRemainder;
+    pindex(:,:,cIm-nRemainder+1:cIm)=...
+        repmat(pindex(:,:,cIm-nRemainder),1,1,nRemainder);
 end

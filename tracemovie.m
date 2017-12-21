@@ -1,5 +1,5 @@
 function [trace]=tracemovie(file,rinnercircle,...
-    routercircle,nch,peaks1,dim1,peaks2,dim2,peaks3,dim3)
+    routercircle,nImagesAvg,nch,peaks1,dim1,peaks2,dim2,peaks3,dim3)
 %%Extract peak intensities from an image stack
 %Jared Bard August 18, 2014
 %Each channel will have a column in the peak_cell: 1=# of peaks,
@@ -42,7 +42,8 @@ for i =1:nch
     %calculate indexes of peaks based on size of peak (innercircle) and
 %size of background (routercircle) ([indexOutercircle indexInnercircle])
     peak_cell{i,4}=indexPeaks([(y_end-y_start+1) (x_end-x_start+1)],...
-        peak_cell{i,3},rinnercircle,routercircle);
+        peak_cell{i,3},rinnercircle,routercircle,...
+        nImagesProcess,nImagesAvg);
     %initialize array to store traces
     trace{i,1}=zeros(peak_cell{i,1},5,nImagesProcess,'double');
 end

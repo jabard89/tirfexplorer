@@ -22,7 +22,7 @@ function varargout = tirfexplorer_alex(varargin)
 
 % Edit the above text to modify the response to help tirfexplorer_alex
 
-% Last Modified by GUIDE v2.5 14-Nov-2017 23:24:03
+% Last Modified by GUIDE v2.5 20-Dec-2017 18:16:42
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -67,6 +67,7 @@ handles.maxPeaks=1000; %maximum number of peaks to analyze
 handles.leftThresholdToggle=0; %0 uses a gui for thresholding.
 handles.rightThresholdToggle=0; %0 uses a gui for thresholding.
 handles.peaksFromFileToggle=0; %0 loads peaks from the movie
+handles.allTracesCalculated=0; %0 until all traces are calculated
 
 
 % Update handles structure
@@ -107,6 +108,7 @@ right_dim=handles.right_dim;
 handles=initializeImages(handles);
 exp=handles.exp;
 nImagesProcess=handles.nImagesProcess;
+handles.allTracesCalculated=0; %Reset switch
 
 if ~handles.peaksFromFileToggle
     %Load the peaks from the image
@@ -142,8 +144,10 @@ set(handles.listbox2,'String',exp.linknames)
 if handles.alexToggle
     acceptorFile=handles.acceptorFile;
 end
+disp('Making Movies')
 handles.donorMovie=makeMovie(donorFile,nImagesProcess,left_dim);
 handles.fretMovie=makeMovie(donorFile,nImagesProcess,right_dim);
+disp('Movies Made')
 if handles.alexToggle
     handles.acceptorMovie=makeMovie(acceptorFile,nImagesProcess,right_dim);
 end
@@ -260,11 +264,11 @@ function plotDonorAcceptorButton_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 %Calculate Relative traces
 if ~handles.alexToggle
-    error('Please turn on Alex to use this setting')
+    errordlg('Please turn on Alex to use this setting')
     return
 end
-lTrace=squeeze(handles.ltrace{1});
-rTrace=squeeze(handles.rAcceptortraces{1});
+lTrace=squeeze(handles.donorTrace);
+rTrace=squeeze(handles.acceptorTrace);
 plotFret(handles,lTrace,rTrace,0);
 
 
@@ -276,11 +280,11 @@ function listbox2_Callback(hObject, eventdata, handles)
 
 % Hints: contents = cellstr(get(hObject,'String')) returns listbox2 contents as cell array
 %        contents{get(hObject,'Value')} returns selected item from listbox2
-peak_i=get(hObject,'Value');
-handles.peakl_i=peak_i;
-handles.peakr_i=peak_i;
-peak1=handles.exp.linked_lpeaks(peak_i,:,:);
-peak2=handles.exp.linked_rpeaks(peak_i,:,:);
+linkedPeakIndex=get(hObject,'Value');
+handles.peakl_i=handles.exp.linki(linkedPeakIndex,1);
+handles.peakr_i=handles.exp.linki(linkedPeakIndex,2);
+peak1=handles.exp.linked_lpeaks(linkedPeakIndex,:,:);
+peak2=handles.exp.linked_rpeaks(linkedPeakIndex,:,:);
 handles.peak1=peak1;
 handles.peak2=peak2;
 handles=plotPoint2(handles,'both',peak1,peak2);
@@ -307,26 +311,23 @@ function export_t_Callback(hObject, eventdata, handles)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 %Exports the current left and right traces as objects to the workspace
-if isfield(handles,'ltrace')
-    ltrace=squeeze(handles.ltrace{1});
+if isfield(handles,'donorTrace')
     peak_lname=inputdlg('Name the Left Trace');
-    assignin('base',peak_lname{1},ltrace);
+    assignin('base',peak_lname{1},handles.donorTrace);
 end
-if isfield(handles,'rtrace')
-    rtrace=squeeze(handles.rtrace{1});
+if isfield(handles,'fretTrace')
     peak_rname=inputdlg('Name the Right Trace');
-    assignin('base',peak_rname{1},rtrace);
+    assignin('base',peak_rname{1},handles.fretTrace);
 end
-if isfield(handles,'rAcceptorTraces')
-    acceptorTrace=squeeze(handles.rAcceptorTraces{1});
+if isfield(handles,'acceptorTrace')
     peak_acceptorname=inputdlg('Name the Acceptor Trace');
-    assignin('base',peak_acceptorname{1},acceptorTrace);
+    assignin('base',peak_acceptorname{1},handles.acceptorTrace);
 end
 
 
 % --------------------------------------------------------------------
-function export_all_Callback(hObject, eventdata, handles)
-% hObject    handle to export_all (see GCBO)
+function exportLinkedTraces_Callback(hObject, eventdata, handles)
+% hObject    handle to exportLinkedTraces (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
 %Export all traces listed as linked peaks
@@ -335,23 +336,27 @@ function export_all_Callback(hObject, eventdata, handles)
 %pScore_output follows this format:
 %[Total_Peak_intensity (signal minus noise), avg_peak_intensity (average
 %signal), avg_bkgd_intensity, peak_size, background_size]
-linked_traces=tracemovie(handles.donorFile,handles.rinnercircle,...
-    handles.routercircle,2,handles.exp.linked_lpeaks,handles.left_dim,...
-    handles.exp.linked_rpeaks,handles.right_dim);
-exp=handles.exp;
-exp.linked_ltraces=linked_traces{1};
-exp.linked_rtraces=linked_traces{2};
-exp_name=inputdlg('Name the Donor Exp File');
-assignin('base',exp_name{1},exp);
-
-if handles.alexToggle
-    allAcceptorTraces=tracemovie(handles.acceptorFile,handles.rinnercircle,...
-        handles.routercircle,1,handles.exp.linked_rpeaks,handles.right_dim);
-    handles.expAcceptor.allAcceptorTraces=allAcceptorTraces;
-    expNameAcceptor=inputdlg('Name the Acceptor Exp File');
-    assignin('base',expNameAcceptor{1},exp);
+if ~handles.allTracesCalculated
+    handles=calcAllTraces(handles);
+    handles.allTracesCalculated=1;
 end
 
+linkedDonorTraces=handles.allDonorTraces(handles.exp.linki(:,1),:,:);
+linkedFretTraces=handles.allFretTraces(handles.exp.linki(:,2),:,:);
+
+donorName=inputdlg('Name the Donor Traces');
+assignin('base',donorName{1},linkedDonorTraces);
+
+fretName=inputdlg('Name the FRET Traces');
+assignin('base',fretName{1},linkedFretTraces);
+
+if handles.alexToggle
+    linkedAcceptorTraces=handles.allAcceptorTraces...
+        (handles.exp.linki(:,2),:,:);
+    acceptorName=inputdlg('Name the Acceptor Traces');
+    assignin('base',acceptorname{1},linkedAcceptorTraces);
+end
+disp('Export Complete')
 
 % --------------------------------------------------------------------
 function Untitled_1_Callback(hObject, eventdata, handles)
@@ -490,9 +495,11 @@ rightThresholdMsg=sprintf('%s%d','Currently the Right Threshold is set to: ',...
     handles.rightThresholdToggle);
 peaksFromFileMsg=sprintf('%s%d','Currently the Peaks From File Toggle (0 is off, 1 is on) is set to: ',...
     handles.peaksFromFileToggle);
+allTracesCalculatedMsg=sprintf('%s%d','All Traces have been calculated (1 is yes, 0 is no): ',...
+    handles.allTracesCalculated);
 msgbox({left_dim_msg,right_dim_msg,'',nImagesAvg_msg,nImagesProcess_msg,'',...
     rinnercircle_msg,routercircle_msg,'',alexToggleMsg,driftToggleMsg,maxPeaksMsg,...
-    leftThresholdMsg,rightThresholdMsg,peaksFromFileMsg});
+    leftThresholdMsg,rightThresholdMsg,peaksFromFileMsg,allTracesCalculatedMsg});
 
 
 % --- Executes on button press in openAcceptorChannelButton.
@@ -607,8 +614,8 @@ function plotDonorFretButton_Callback(hObject, eventdata, handles)
 % hObject    handle to plotDonorFretButton (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-lTrace=squeeze(handles.ltrace{1});
-rTrace=squeeze(handles.rtrace{1});
+lTrace=handles.donorTrace;
+rTrace=handles.fretTrace;
 plotFret(handles,lTrace,rTrace,0);
 
 % --------------------------------------------------------------------
@@ -682,7 +689,7 @@ else
     rightPeakIndex=1;
 end
 leftPeakIndices=indexPeaks([(leftYEnd-leftYStart+1) (leftXEnd-leftXStart+1)]...
-    ,exp.linked_lpeaks(leftPeakIndex,:),handles.rinnercircle,handles.routercircle);
+    ,exp.lfilt(leftPeakIndex,:),handles.rinnercircle,handles.routercircle);
 axes(handles.donorImageAxes);
 hold on
 for i=1:size(leftPeakIndices,1)
@@ -703,7 +710,7 @@ end
 hold off
 
 rightPeakIndices=indexPeaks([(rightYEnd-rightYStart+1) (rightXEnd-rightXStart+1)]...
-    ,exp.linked_rpeaks(rightPeakIndex,:),handles.rinnercircle,handles.routercircle);
+    ,exp.rfilt(rightPeakIndex,:),handles.rinnercircle,handles.routercircle);
 axes(handles.fretImageAxes);
 hold on
 for i=1:size(rightPeakIndices,1)
@@ -754,11 +761,11 @@ fps=4;
 leftPeak=0;
 rightPeak=0;
 if isfield(handles,'peakl_i')
-    leftPeak=handles.exp.linked_lpeaks(handles.peakl_i,:,:);
+    leftPeak=handles.exp.lfilt(handles.peakl_i,:,:);
 end
 
 if isfield(handles,'peakr_i')
-    rightPeak=handles.exp.linked_rpeaks(handles.peakr_i,:,:);
+    rightPeak=handles.exp.rfilt(handles.peakr_i,:,:);
 end
 
 %Open a separate figure for each channel and overlay the peaks
@@ -830,11 +837,11 @@ exp=handles.exp;
 leftPeak=0;
 rightPeak=0;
 if isfield(handles,'peakl_i')
-    leftPeak=handles.exp.linked_lpeaks(handles.peakl_i,:,:);
+    leftPeak=handles.exp.lfilt(handles.peakl_i,:,:);
 end
 
 if isfield(handles,'peakr_i')
-    rightPeak=handles.exp.linked_rpeaks(handles.peakr_i,:,:);
+    rightPeak=handles.exp.rfilt(handles.peakr_i,:,:);
 end
 
 %Open a separate figure for each channel and overlay the peaks
@@ -965,3 +972,14 @@ function reopenWindowsButton_Callback(hObject, eventdata, handles)
 % handles    structure with handles and user data (see GUIDATA)
 handles=loadFigureWindows(handles);
 guidata(hObject,handles);
+
+
+% --------------------------------------------------------------------
+function calcAllTraces_Callback(hObject, eventdata, handles)
+% hObject    handle to calcAllTraces (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+handles=calcAllTraces(handles);
+handles.allTracesCalculated=1;
+guidata(hObject,handles);
+disp('Finished')
