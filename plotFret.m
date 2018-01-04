@@ -10,8 +10,8 @@ if method==0
     lt=lTrace(2,:)-lTrace(3,:);
     rt=rTrace(2,:)-rTrace(3,:);
     %scale lt and rt to min and max
-    lt_s=lt./max(lt_s);
-    rt_s=rt./max(rt_s);
+    lt_s=lt./max(lt);
+    rt_s=rt./max(rt);
     len=length(lTrace);
     set(handles.plots.rFretCalcTrace,'XData',1:len,'YData',lt_s);
     set(handles.fretCalcAxes,'XLim',[1 len]);
