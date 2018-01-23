@@ -689,7 +689,8 @@ else
     rightPeakIndex=1;
 end
 leftPeakIndices=indexPeaks([(leftYEnd-leftYStart+1) (leftXEnd-leftXStart+1)]...
-    ,exp.lfilt(leftPeakIndex,:),handles.rinnercircle,handles.routercircle);
+    ,exp.lfilt(leftPeakIndex,:,:),handles.rinnercircle,...
+    handles.routercircle,handles.nImagesProcess,handles.nImagesAvg);
 axes(handles.donorImageAxes);
 hold on
 for i=1:size(leftPeakIndices,1)
@@ -710,7 +711,8 @@ end
 hold off
 
 rightPeakIndices=indexPeaks([(rightYEnd-rightYStart+1) (rightXEnd-rightXStart+1)]...
-    ,exp.rfilt(rightPeakIndex,:),handles.rinnercircle,handles.routercircle);
+    ,exp.rfilt(rightPeakIndex,:,:),handles.rinnercircle,handles.routercircle,...
+    handles.nImagesProcess,handles.nImagesAvg);
 axes(handles.fretImageAxes);
 hold on
 for i=1:size(rightPeakIndices,1)
@@ -728,7 +730,6 @@ for i=1:size(rightPeakIndices,1)
 end
 drawnow
 hold off
-setAxesProperties(handles);
 'Done Plotting'
 
 
