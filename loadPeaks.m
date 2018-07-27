@@ -95,13 +95,13 @@ for cIm=1:nA:nImagesProcess-nRemainder
         [temp.lp]=findPeaks(temp.l,leftThreshold);
     else
         [temp.lp leftThreshold]=findPeaks(temp.l);
-        fprintf([num2str(leftThreshold),'\n']);
+        fprintf(['Left threshold: ' num2str(leftThreshold),'\n']);
     end
    if rightThreshold
         [temp.rp]=findPeaks(temp.r,rightThreshold);
     else
         [temp.rp rightThreshold]=findPeaks(temp.r);
-        fprintf([num2str(rightThreshold),'\n']);
+        fprintf(['Right threshold: ' num2str(rightThreshold),'\n']);
    end
     temp.lfilt=filterPeaks(temp.l,temp.lp,filterDistance,2);
     temp.rfilt=filterPeaks(temp.r,temp.rp,filterDistance,2);

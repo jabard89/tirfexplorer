@@ -5,7 +5,7 @@ function handles=calcAllTraces(handles)
 %Takes handles from the gui as input
 
 %First initialize trace array
-disp('Calculating');
+fprintf(['\n' 'Calculating' '\n']);
 donorPeaks=handles.exp.lfilt;
 fretPeaks=handles.exp.rfilt; %fretPeaks are same as acceptorPeaks
 

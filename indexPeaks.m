@@ -18,9 +18,7 @@ pindex=cell(nPeaks,2,nFrames);
 
 nA=nImagesAvg;
 nRemainder=mod(nImagesProcess-1,nImagesAvg);
-disp('Making peak indices for:')
 for cIm=1:nA:nImagesProcess-nRemainder
-    disp(cIm)
     %First fill in previous frames
     if cIm>1
         pindex(:,:,cIm-nA+1:cIm-1)=repmat(pindex(:,:,cIm-nA),1,1,nA-1);

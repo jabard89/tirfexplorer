@@ -957,8 +957,6 @@ function calcAllTraces_Callback(hObject, eventdata, handles)
 handles=calcAllTraces(handles);
 handles.allTracesCalculated=1;
 guidata(hObject,handles);
-finishMsg = sprintf('%s\n','Finished!');
-disp(finishMsg);
 
 
 % --------------------------------------------------------------------

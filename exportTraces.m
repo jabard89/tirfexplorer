@@ -11,7 +11,7 @@
 %Traces are stored in a cell array (nMols x 1) in which each cell contains
 %a [2 nFrames] array with Donor and Acceptor traces
 function h = exportTraces(handles,whichTraces)
-    fprintf(['Beginning export','\n']);
+    fprintf(['\n' 'Beginning export','\n']);
     if ~handles.allTracesCalculated
         handles=calcAllTraces(handles);
         handles.allTracesCalculated=1;
