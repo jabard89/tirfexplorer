@@ -11,6 +11,7 @@ function [trace]=tracemovie(file,rinnercircle,...
 %[Total_Peak_intensity (signal minus noise), avg_peak_intensity (average
 %signal), avg_bkgd_intensity, peak_size, background_size]
 %%First extract file information from the tif file
+fprintf(['Extracting Traces' '\n']);
 file_info=imfinfo(file);
 file_x=file_info(1).Width;
 file_y=file_info(1).Height;
@@ -62,8 +63,9 @@ for j=1:nImagesProcess
         temp_i=image(y_start:y_end,x_start:x_end);
         trace{i,1}(:,:,j)=pScore(temp_i,peak_cell{i,4}(:,:,j));
     end
-    if mod(j,25)==0
-        fprintf(['\n' num2str(j) '\n']);
-    end
+%     if mod(j,25)==0
+%         fprintf(['\n' num2str(j) '\n']);
+%     end
 end
+fprintf(['Done extracting!' '\n']);
 end

@@ -22,7 +22,7 @@ function varargout = tirfexplorer_alex(varargin)
 
 % Edit the above text to modify the response to help tirfexplorer_alex
 
-% Last Modified by GUIDE v2.5 26-Jul-2018 23:07:33
+% Last Modified by GUIDE v2.5 27-Jul-2018 01:36:30
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -57,8 +57,8 @@ handles.output = hObject;
 %Set initial parameters
 handles.rinnercircle=3; %circle around peak for data collection
 handles.routercircle=6; %donut around peak for background information
-handles.left_dim=[23 249 19 512]; %based on alignment of tetraspeck
-handles.right_dim=[269 495 11 504];
+handles.left_dim=[1 244 1 512]; %based on alignment of tetraspeck
+handles.right_dim=[245 488 1 512];
 handles.nImagesAvg=5; %how many averages to average for images
 handles.nImagesProcess=0; %frames to analyze (0=all)
 handles.alexToggle=0; %use a seperate channel for acceptor
@@ -69,7 +69,7 @@ handles.rightThresholdToggle=0; %0 uses a gui for thresholding.
 handles.peaksFromFileToggle=0; %0 loads peaks from the movie
 handles.allTracesCalculated=0; %0 until all traces are calculated
 handles.figureLayoutToggle = 0; %0 to overlay traces
-
+handles.filterDistance = 10; %remove all peaks that are closer than 10 pixels to another peak
 
 % Update handles structure
 guidata(hObject, handles);
@@ -312,20 +312,9 @@ function export_t_Callback(hObject, eventdata, handles)
 % hObject    handle to export_t (see GCBO)
 % eventdata  reserved - to be defined in a future version of MATLAB
 % handles    structure with handles and user data (see GUIDATA)
-%Exports the current left and right traces as objects to the workspace
-if isfield(handles,'donorTrace')
-    peak_lname=inputdlg('Name the Left Trace');
-    assignin('base',peak_lname{1},handles.donorTrace);
-end
-if isfield(handles,'fretTrace')
-    peak_rname=inputdlg('Name the Right Trace');
-    assignin('base',peak_rname{1},handles.fretTrace);
-end
-if isfield(handles,'acceptorTrace')
-    peak_acceptorname=inputdlg('Name the Acceptor Trace');
-    assignin('base',peak_acceptorname{1},handles.acceptorTrace);
-end
-
+%Exports the current trace to the workspace ([Donor;Acceptor])
+handles = exportTraces(handles,'selected');
+guidata(hObject,handles);
 
 % --------------------------------------------------------------------
 function exportLinkedTraces_Callback(hObject, eventdata, handles)
@@ -338,27 +327,8 @@ function exportLinkedTraces_Callback(hObject, eventdata, handles)
 %pScore_output follows this format:
 %[Total_Peak_intensity (signal minus noise), avg_peak_intensity (average
 %signal), avg_bkgd_intensity, peak_size, background_size]
-if ~handles.allTracesCalculated
-    handles=calcAllTraces(handles);
-    handles.allTracesCalculated=1;
-end
-
-linkedDonorTraces=handles.allDonorTraces(handles.exp.linki(:,1),:,:);
-linkedFretTraces=handles.allFretTraces(handles.exp.linki(:,2),:,:);
-
-donorName=inputdlg('Name the Donor Traces');
-assignin('base',donorName{1},linkedDonorTraces);
-
-fretName=inputdlg('Name the FRET Traces');
-assignin('base',fretName{1},linkedFretTraces);
-
-if handles.alexToggle
-    linkedAcceptorTraces=handles.allAcceptorTraces...
-        (handles.exp.linki(:,2),:,:);
-    acceptorName=inputdlg('Name the Acceptor Traces');
-    assignin('base',acceptorname{1},linkedAcceptorTraces);
-end
-disp('Export Complete')
+handles = exportTraces(handles,'all');
+guidata(hObject,handles);
 
 % --------------------------------------------------------------------
 function Untitled_1_Callback(hObject, eventdata, handles)
@@ -1007,3 +977,18 @@ else
     handles=loadFigureWindows(handles);
     guidata(hObject,handles);
 end
+
+
+% --------------------------------------------------------------------
+function exportLeftPeaksButton_Callback(hObject, eventdata, handles)
+% hObject    handle to exportLeftPeaksButton (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+exportPeaks(handles.exp,0,0,'left')
+
+% --------------------------------------------------------------------
+function exportRightPeaksButton_Callback(hObject, eventdata, handles)
+% hObject    handle to exportRightPeaksButton (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+exportPeaks(handles.exp,0,0,'right')

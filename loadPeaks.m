@@ -11,6 +11,8 @@ nImagesAvg=handles.nImagesAvg;
 donorFile=handles.donorFile;
 left_dim=handles.left_dim;
 right_dim=handles.right_dim;
+filterDistance=handles.filterDistance;
+
 exp=handles.exp;
 if handles.alexToggle
     acceptorFile=handles.acceptorFile;
@@ -93,16 +95,16 @@ for cIm=1:nA:nImagesProcess-nRemainder
         [temp.lp]=findPeaks(temp.l,leftThreshold);
     else
         [temp.lp leftThreshold]=findPeaks(temp.l);
-        leftThreshold
+        fprintf([num2str(leftThreshold),'\n']);
     end
    if rightThreshold
         [temp.rp]=findPeaks(temp.r,rightThreshold);
     else
         [temp.rp rightThreshold]=findPeaks(temp.r);
-        rightThreshold
+        fprintf([num2str(rightThreshold),'\n']);
    end
-    temp.lfilt=filterPeaks(temp.l,temp.lp,10,2);
-    temp.rfilt=filterPeaks(temp.r,temp.rp,10,2);
+    temp.lfilt=filterPeaks(temp.l,temp.lp,filterDistance,2);
+    temp.rfilt=filterPeaks(temp.r,temp.rp,filterDistance,2);
     %filter out new peaks from the temporary images by comparing against
     %the previous list
     newPeakCounter=0;

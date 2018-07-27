@@ -24,10 +24,34 @@ if handles.alexToggle
 end
 
 nImagesAvg=handles.nImagesAvg;
+fileInfo = imfinfo(donorFile);
+
 if handles.nImagesProcess==0
-    handles.nImagesProcess=length(imfinfo(donorFile));
+    handles.nImagesProcess=length(fileInfo);
 end
 nImagesProcess=handles.nImagesProcess;
+
+%Extract time
+%First double check that the timestamp has been written where we expect it
+if isfield (fileInfo,'ImageDescription') && ...
+        ~isempty(str2num(fileInfo(1).ImageDescription))
+    for j=1:nImagesProcess
+        timestamp = str2num(fileInfo(j).ImageDescription);
+        if ~isempty(timestamp)
+            timeTemp(j)=timestamp./1000;
+        end
+    end
+else
+    timeTemp = 1:nImagesProcess;
+    timePrompt=sprintf('%s','Please enter the time resolution of the trace (in ms): ');
+    answer = inputdlg(timePrompt);
+    if ~isempty(answer) && ~isempty(answer{1})
+        timeResolution = str2num(answer{1});
+        timeTemp = timeTemp.*timeResolution./1000;
+    end
+end
+handles.time = timeTemp;
+    
 
 left_dim=handles.left_dim;
 right_dim=handles.right_dim;
