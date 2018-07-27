@@ -22,7 +22,7 @@ function varargout = tirfexplorer_alex(varargin)
 
 % Edit the above text to modify the response to help tirfexplorer_alex
 
-% Last Modified by GUIDE v2.5 20-Dec-2017 18:16:42
+% Last Modified by GUIDE v2.5 26-Jul-2018 23:07:33
 
 % Begin initialization code - DO NOT EDIT
 gui_Singleton = 1;
@@ -68,6 +68,7 @@ handles.leftThresholdToggle=0; %0 uses a gui for thresholding.
 handles.rightThresholdToggle=0; %0 uses a gui for thresholding.
 handles.peaksFromFileToggle=0; %0 loads peaks from the movie
 handles.allTracesCalculated=0; %0 until all traces are calculated
+handles.figureLayoutToggle = 0; %0 to overlay traces
 
 
 % Update handles structure
@@ -173,7 +174,8 @@ if handles.driftToggle
 end
 
 guidata(hObject,handles);
-finished='yes'
+finishMsg = sprintf('%s\n','Finished!');
+disp(finishMsg);
 
 % --------------------------------------------------------------------
 function FileMenu_Callback(hObject, eventdata, handles)
@@ -497,9 +499,11 @@ peaksFromFileMsg=sprintf('%s%d','Currently the Peaks From File Toggle (0 is off,
     handles.peaksFromFileToggle);
 allTracesCalculatedMsg=sprintf('%s%d','All Traces have been calculated (1 is yes, 0 is no): ',...
     handles.allTracesCalculated);
+figureLayoutMsg=sprintf('%s%d','Donor and acceptor channels displayed seperately (1) or overlayed (0): ',...
+    handles.figureLayoutToggle);
 msgbox({left_dim_msg,right_dim_msg,'',nImagesAvg_msg,nImagesProcess_msg,'',...
     rinnercircle_msg,routercircle_msg,'',alexToggleMsg,driftToggleMsg,maxPeaksMsg,...
-    leftThresholdMsg,rightThresholdMsg,peaksFromFileMsg,allTracesCalculatedMsg});
+    leftThresholdMsg,rightThresholdMsg,peaksFromFileMsg,allTracesCalculatedMsg,figureLayoutMsg});
 
 
 % --- Executes on button press in openAcceptorChannelButton.
@@ -983,4 +987,23 @@ function calcAllTraces_Callback(hObject, eventdata, handles)
 handles=calcAllTraces(handles);
 handles.allTracesCalculated=1;
 guidata(hObject,handles);
-disp('Finished')
+finishMsg = sprintf('%s\n','Finished!');
+disp(finishMsg);
+
+
+% --------------------------------------------------------------------
+function figureLayoutButton_Callback(hObject, eventdata, handles)
+% hObject    handle to figureLayoutButton (see GCBO)
+% eventdata  reserved - to be defined in a future version of MATLAB
+% handles    structure with handles and user data (see GUIDATA)
+figureLayoutMsg=sprintf('%s\n%s%d\n%s','Show donor and acceptor channels seperately (1) or overlayed (0)?',...
+    'Current state is: ',handles.figureLayoutToggle,'Change to:');
+answer=inputdlg(figureLayoutMsg);
+if isempty(answer) || isempty(answer{1})
+    return
+else
+    figureLayoutString=answer;
+    handles.figureLayoutToggle=str2num(figureLayoutString{1});
+    handles=loadFigureWindows(handles);
+    guidata(hObject,handles);
+end

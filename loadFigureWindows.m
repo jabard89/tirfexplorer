@@ -1,7 +1,8 @@
 %%Loads the figure windows
 %Jared Bard
 %November 14, 2017
-
+%Edited on July 27, 2018 to change figure layout. Still needs to be fixed
+%for ALEX
 function h = loadFigureWindows(handles)
 %Checks if figure windows are open or still valid before reopening them
 %For each axes, make line objects for the different color spectrums (green,
@@ -100,33 +101,62 @@ if handles.alexToggle
     handles.acceptorTraceAxes=subplot(4,1,3);
     handles.fretCalcAxes=subplot(4,1,4);
 else
-    handles.donorTraceAxes=subplot(3,1,1);
-    handles.fretTraceAxes=subplot(3,1,2);
-    handles.fretCalcAxes=subplot(3,1,3);
+    if handles.figureLayoutToggle
+        handles.donorTraceAxes=subplot(5,1,1);
+        handles.fretTraceAxes=subplot(5,1,2);
+        handles.overlayTraceAxes=subplot(5,1,3);
+        handles.totalTraceAxes=subplot(5,1,4);
+        handles.fretCalcAxes=subplot(5,1,5);
+    else
+        handles.overlayTraceAxes=subplot(3,1,1);
+        handles.totalTraceAxes=subplot(3,1,2);
+        handles.fretCalcAxes=subplot(3,1,3);
+    end
 end
 
-axes(handles.donorTraceAxes);
+if handles.figureLayoutToggle
+    axes(handles.donorTraceAxes);
+    hold on;
+    title('Donor');
+    plots.donorTrace=plot(0,0,'r-');
+    plots.donorBkgdTrace=plot(0,0,'k-');
+    set(plots.donorTrace,'XData',[],'YData',[]);
+    set(plots.donorBkgdTrace,'XData',[],'YData',[]);
+    hold off;
+
+    axes(handles.fretTraceAxes);
+    hold on;
+    title('Acceptor');
+    plots.fretTrace=plot(0,0,'b-');
+    plots.fretBkgdTrace=plot(0,0,'k-');
+    set(plots.fretTrace,'XData',[],'YData',[]);
+    set(plots.fretBkgdTrace,'XData',[],'YData',[]);
+    hold off;
+end
+
+axes(handles.overlayTraceAxes);
 hold on;
-title('Donor');
-plots.donorTrace=plot(0,0,'r-');
-set(plots.donorTrace,'XData',[],'YData',[]);
+title('Overlay');
+plots.donorOverlayTrace = plot(0,0,'r-');
+plots.fretOverlayTrace = plot(0,0,'b-');
+set(plots.donorOverlayTrace,'XData',[],'YData',[]);
+set(plots.fretOverlayTrace,'XData',[],'YData',[]);
+% legend('Donor','Acceptor','Location','northeast','Orientation','horizontal');
+% legend('boxoff');
 hold off;
 
-axes(handles.fretTraceAxes);
+axes(handles.totalTraceAxes);
 hold on;
-title('FRET');
-plots.fretTrace=plot(0,0,'b-');
-set(plots.fretTrace,'XData',[],'YData',[]);
+title('Total');
+plots.totalTrace=plot(0,0,'k-');
+set(plots.totalTrace,'XData',[],'YData',[]);
 hold off;
 
 axes(handles.fretCalcAxes);
 hold on;
 title('FRET Calc');
-plots.rFretCalcTrace=plot(0,0,'r-');
-set(plots.rFretCalcTrace,'XData',[],'YData',[]);
-plots.bFretCalcTrace=plot(0,0,'b-');
-set(plots.bFretCalcTrace,'XData',[],'YData',[]);
-legend({'Cy3','Cy5'})
+plots.fretCalcTrace=plot(0,0,'k-');
+set(plots.fretCalcTrace,'XData',[],'YData',[]);
 hold off;
 
 if handles.alexToggle

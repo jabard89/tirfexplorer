@@ -2,8 +2,10 @@
 %%array
 %Jared Bard
 %November 14, 2017
+%On July 27, 2018 changed reporting
 function h = loadPeaks(handles)
 %Load variables from handles
+disp('scanning for peaks');
 nImagesProcess=handles.nImagesProcess;
 nImagesAvg=handles.nImagesAvg;
 donorFile=handles.donorFile;
@@ -42,7 +44,7 @@ end
 %make five frame averages
 nA=nImagesAvg;
 for cIm=1:nA:nImagesProcess-nRemainder
-    cIm %report the image # being processed
+    cIm; %report the image # being processed
     
     %Copy peaks from previous frames
     if cIm>1
@@ -98,7 +100,7 @@ for cIm=1:nA:nImagesProcess-nRemainder
     else
         [temp.rp rightThreshold]=findPeaks(temp.r);
         rightThreshold
-    end
+   end
     temp.lfilt=filterPeaks(temp.l,temp.lp,10,2);
     temp.rfilt=filterPeaks(temp.r,temp.rp,10,2);
     %filter out new peaks from the temporary images by comparing against
@@ -132,9 +134,9 @@ for cIm=1:nA:nImagesProcess-nRemainder
                 repmat(temp.rfilt(j,:),1,1,nA);
         end
     end
-    %report progress
-    nLeftFilt=sum(leftFilt(:,1,cIm)~=0)
-    nRightFilt=sum(rightFilt(:,1,cIm)~=0)
+%     %report progress
+%     nLeftFilt=sum(leftFilt(:,1,cIm)~=0);
+%     nRightFilt=sum(rightFilt(:,1,cIm)~=0);
 end
 %Fill out peaks with last few frames if not divisible by 5
 nRemainder=mod(nImagesProcess,nA);
@@ -161,5 +163,13 @@ for i=1:nRightFilt
 end
 exp.lfilt=leftFilt;
 exp.rfilt=rightFilt;
+%report progress
+nLeftFilt=sum(leftFilt(:,1,cIm)~=0);
+nRightFilt=sum(rightFilt(:,1,cIm)~=0);
+
+leftFiltMsg=sprintf('%s%d','Left peaks found: ',nLeftFilt);
+disp(leftFiltMsg);
+rightFiltMsg = sprintf('%s%d','Right peaks found: ',nRightFilt);
+disp(rightFiltMsg);
 handles.exp=exp;
 h=handles;
