@@ -1,4 +1,5 @@
 function detectedParticles = findpeaks3(imfilt,im, threshold,  bpDiameter,windowSize)
+%Edited on July 27, 2018 by jared to enable parallel computing
 %function detectedParticles = findpeaks3(imfilt,im, threshold,  bpDiameter,windowSize)
 % plot the points using the emory routines
 % modified 241008 to take account of bandpass setting edges 
@@ -14,7 +15,7 @@ function detectedParticles = findpeaks3(imfilt,im, threshold,  bpDiameter,window
 % Email: s.holden1@physics.ox.ac.uk
 % Copyright (C) 2010, Isis Innovation Limited.
 % All rights reserved.
-% TwoTone is released under an “academic use only” license; for details please see the accompanying ‘TWOTONE_LICENSE.doc’. Usage of the software requires acceptance of this license
+% TwoTone is released under an “academic use only�? license; for details please see the accompanying ‘TWOTONE_LICENSE.doc’. Usage of the software requires acceptance of this license
 %
 
 posLim =0.5*windowSize;%if its going to move significantly we already have a problem
@@ -85,8 +86,13 @@ else
 end
 
 nPos = size(pos,1);
-k = 1;
-for i =1:nPos
+successVector=false(nPos,1);
+posOutAll=zeros(nPos,2);
+brightness=zeros(nPos,1);
+sx=zeros(nPos,1);
+sy = zeros(nPos,1);
+ecc = zeros(nPos,1);
+parfor i =1:nPos
   posCur = pos(i,:);
   initguess = [0];%no initguess
   %initguess = [amplitude widthguess background X_POSim Y_POSim ];
@@ -94,11 +100,16 @@ for i =1:nPos
   [phot_count a normChi2 posOut eccentricity] = freeGaussFitEllipse( im, pos(i,:), windowSize,posLim, sigmaLim, initguess,'autoDetect',fitArg{:});
 
   if ~all(a == 0 )%if the fit has worked
-    posOutAll(k,:) = posOut;
-    brightness(k,1) = a(1);
-    sx(k,1) = a(2);
-    sy(k,1) = a(3);
-    ecc(k,1) = eccentricity;
-    k=k+1;
+    successVector(i) = 1;
+    posOutAll(i,:) = posOut;
+    brightness(i,1) = a(1);
+    sx(i,1) = a(2);
+    sy(i,1) = a(3);
+    ecc(i,1) = eccentricity;
   end
 end
+posOutAll(~successVector) = [];
+brightness(~successVector) = [];
+sx(~successVector) = [];
+sy(~successVector) = [];
+ecc(~successVector) = [];
